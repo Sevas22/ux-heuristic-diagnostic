@@ -147,6 +147,10 @@ export default async function handler(req, res) {
       args: chromiumBinary.args,
       executablePath,
       headless: true,
+      // dumpio: cuando el proceso de Chromium muere DESPUÉS de arrancar bien (no en el launch()
+      // en sí), Playwright no siempre logra rescatar su stderr para el mensaje de error — esto lo
+      // redirige directo a nuestros logs de función, sea cual sea el momento en que falle.
+      dumpio: true,
     });
     // @axe-core/playwright necesita que la página venga de un BrowserContext explícito para
     // poder inyectar su script de análisis; browser.newPage() por sí solo no alcanza.
