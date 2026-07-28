@@ -2,7 +2,7 @@
   "functions": {
     "api/inspect.js": {
       "maxDuration": 60,
-      "memory": 1769,
+      "memory": 1024,
       "includeFiles": "node_modules/@sparticuz/chromium/**"
     }
   }
