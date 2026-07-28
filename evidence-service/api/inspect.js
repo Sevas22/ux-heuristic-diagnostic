@@ -8,7 +8,9 @@ import path from "node:path";
 // El runtime Node de Vercel no trae por defecto las librerías compartidas que el binario de
 // Chromium de @sparticuz necesita (libnss3.so y compañía) — vienen empaquetadas junto al propio
 // binario, pero el linker dinámico no las encuentra a menos que se lo digamos explícitamente acá.
-chromiumBinary.setGraphicsMode(false);
+// Ojo: graphicsMode es una propiedad con setter, no un método — chromiumBinary.setGraphicsMode(false)
+// rompe el módulo entero al cargar (TypeError no capturado, crashea toda la función serverless).
+chromiumBinary.graphicsMode = false;
 
 // Config del runtime serverless de Vercel: sin esto, maxDuration/memory de vercel.json solo
 // aplican si además está declarado acá (Vercel lee ambos, pero conviene que coincidan).
