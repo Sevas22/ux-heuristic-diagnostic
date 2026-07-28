@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 30% 14%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 30% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 30% 14%;
+
+    --primary: 222 65% 40%;
+    --primary-foreground: 0 0% 100%;
+
+    --primary-soft: 222 60% 94%;
+    --primary-glow: 222 70% 60%;
+
+    --secondary: 210 30% 94%;
+    --secondary-foreground: 222 30% 20%;
+
+    --muted: 210 25% 95%;
+    --muted-foreground: 222 15% 45%;
+
+    --accent: 172 55% 40%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 55% 35%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 90% 50%;
+    --warning-foreground: 222 30% 14%;
+
+    --border: 214 25% 89%;
+    --input: 214 25% 89%;
+    --ring: 222 65% 40%;
+
+    --radius: 0.75rem;
+
+    --shadow-soft: 0 4px 24px -4px hsl(222 40% 30% / 0.10);
+    --shadow-card: 0 2px 16px -2px hsl(222 30% 14% / 0.06);
+    --shadow-primary: 0 8px 32px -8px hsl(222 65% 40% / 0.30);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Manrope', system-ui, sans-serif;
+  }
+}
