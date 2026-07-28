@@ -137,9 +137,17 @@ export default async function handler(req, res) {
   let browser;
   try {
     const executablePath = await chromiumBinary.executablePath();
-    // El fix real del error "libnss3.so: cannot open shared object file": apuntar el linker
-    // dinámico a la carpeta donde @sparticuz/chromium extrajo el binario y sus .so acompañantes.
-    process.env.LD_LIBRARY_PATH = [path.dirname(executablePath), process.env.LD_LIBRARY_PATH]
+    // El fix real del error "libnss3.so/libnspr4.so: cannot open shared object file": apuntar el
+    // linker dinámico a las carpetas donde @sparticuz/chromium extrae el binario y sus .so
+    // acompañantes. No confiamos solo en que el setup interno del paquete lo haga (a veces, en
+    // contenedores "fríos" de Vercel, no alcanza a tomar efecto) — las agregamos nosotros también,
+    // a propósito de forma redundante; apuntar a una carpeta que no existe no hace daño.
+    process.env.LD_LIBRARY_PATH = [
+      path.dirname(executablePath),
+      "/tmp/al2023/lib",
+      "/tmp/al2/lib",
+      process.env.LD_LIBRARY_PATH,
+    ]
       .filter(Boolean)
       .join(":");
 
