@@ -145,8 +145,8 @@ Deno.serve(async (req) => {
     }
 
     try {
-      // Inspección real de la home: screenshot, DOM renderizado (headings/CTAs), axe-core y Lighthouse.
-      const homeInspection = await inspectSite(submission.website_url, { lighthouse: true });
+      // Inspección real de la home: screenshot, DOM renderizado (headings/CTAs) y axe-core.
+      const homeInspection = await inspectSite(submission.website_url);
 
       const internalLinks = homeInspection.internalLinks.slice(0, MAX_INTERNAL_PAGES);
       const internalInspections = await Promise.all(internalLinks.map((url) => inspectSite(url)));

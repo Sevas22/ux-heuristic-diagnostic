@@ -1,7 +1,8 @@
 // Evidencia real del sitio: en vez de un fetch() crudo (que no ejecuta JS, no ve SPAs, y solo
-// podía dar título/descripción por regex) le pedimos a evidence-service — un microservicio Node
-// con Playwright corriendo en el VPS del usuario — que abra la página de verdad y devuelva
-// screenshot, DOM renderizado, violaciones de accesibilidad (axe-core) y, para la home, Lighthouse.
+// podía dar título/descripción por regex) le pedimos a evidence-service — funciones serverless en
+// Vercel con Playwright — que abra la página de verdad y devuelva screenshot, DOM renderizado y
+// violaciones de accesibilidad (axe-core). Lighthouse queda siempre en null: el plan gratuito de
+// Vercel no da margen de tiempo confiable para correrlo dentro del límite de una función.
 export interface AxeViolation {
   id: string;
   impact: "minor" | "moderate" | "serious" | "critical" | string;
@@ -43,9 +44,11 @@ const EMPTY_INSPECTION: SiteInspection = {
   lighthouse: null,
 };
 
-const INSPECT_TIMEOUT_MS = 45000;
+// Un poco más que el maxDuration de 60s configurado en evidence-service/vercel.json, para que sea
+// Vercel quien corte la función (y devuelva un error legible) antes que nuestro propio abort.
+const INSPECT_TIMEOUT_MS = 65000;
 
-export async function inspectSite(url: string, options: { lighthouse?: boolean } = {}): Promise<SiteInspection> {
+export async function inspectSite(url: string): Promise<SiteInspection> {
   const serviceUrl = Deno.env.get("EVIDENCE_SERVICE_URL");
   if (!serviceUrl) {
     console.error("inspectSite: EVIDENCE_SERVICE_URL no está configurado");
@@ -56,7 +59,7 @@ export async function inspectSite(url: string, options: { lighthouse?: boolean }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), INSPECT_TIMEOUT_MS);
 
-    const res = await fetch(`${serviceUrl.replace(/\/$/, "")}/inspect`, {
+    const res = await fetch(`${serviceUrl.replace(/\/$/, "")}/api/inspect`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -64,7 +67,7 @@ export async function inspectSite(url: string, options: { lighthouse?: boolean }
           ? { "x-evidence-key": Deno.env.get("EVIDENCE_SERVICE_KEY")! }
           : {}),
       },
-      body: JSON.stringify({ url, lighthouse: options.lighthouse ?? false }),
+      body: JSON.stringify({ url }),
       signal: controller.signal,
     });
     clearTimeout(timeout);

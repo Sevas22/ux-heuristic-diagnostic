@@ -1,18 +1,13 @@
 {
   "name": "evidence-service",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Microservicio Playwright/axe-core/Lighthouse: extrae evidencia real de un sitio (screenshot, DOM, accesibilidad, performance) para el generador de informes UX.",
-  "scripts": {
-    "start": "node src/index.js",
-    "postinstall": "playwright install --with-deps chromium"
-  },
+  "description": "Funciones serverless (Vercel) con Playwright + axe-core: extraen evidencia real de un sitio (screenshot, DOM, accesibilidad) para el generador de informes UX.",
   "dependencies": {
     "@axe-core/playwright": "^4.10.0",
-    "chrome-launcher": "^1.1.2",
-    "express": "^4.19.2",
-    "lighthouse": "^12.2.1",
-    "playwright": "^1.47.0"
+    "@sparticuz/chromium": "^131.0.1",
+    "@supabase/supabase-js": "^2.45.0",
+    "playwright-core": "1.49.1"
   }
 }
