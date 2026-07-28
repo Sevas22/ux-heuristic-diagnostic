@@ -3,6 +3,12 @@ import chromiumBinary from "@sparticuz/chromium";
 import { AxeBuilder } from "@axe-core/playwright";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
+import path from "node:path";
+
+// El runtime Node de Vercel no trae por defecto las librerías compartidas que el binario de
+// Chromium de @sparticuz necesita (libnss3.so y compañía) — vienen empaquetadas junto al propio
+// binario, pero el linker dinámico no las encuentra a menos que se lo digamos explícitamente acá.
+chromiumBinary.setGraphicsMode(false);
 
 // Config del runtime serverless de Vercel: sin esto, maxDuration/memory de vercel.json solo
 // aplican si además está declarado acá (Vercel lee ambos, pero conviene que coincidan).
@@ -128,9 +134,16 @@ export default async function handler(req, res) {
 
   let browser;
   try {
+    const executablePath = await chromiumBinary.executablePath();
+    // El fix real del error "libnss3.so: cannot open shared object file": apuntar el linker
+    // dinámico a la carpeta donde @sparticuz/chromium extrajo el binario y sus .so acompañantes.
+    process.env.LD_LIBRARY_PATH = [path.dirname(executablePath), process.env.LD_LIBRARY_PATH]
+      .filter(Boolean)
+      .join(":");
+
     browser = await chromium.launch({
       args: chromiumBinary.args,
-      executablePath: await chromiumBinary.executablePath(),
+      executablePath,
       headless: true,
     });
     // @axe-core/playwright necesita que la página venga de un BrowserContext explícito para
