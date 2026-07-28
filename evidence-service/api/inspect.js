@@ -5,12 +5,12 @@ import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 
-// El runtime Node de Vercel no trae por defecto las librerías compartidas que el binario de
-// Chromium de @sparticuz necesita (libnss3.so y compañía) — vienen empaquetadas junto al propio
-// binario, pero el linker dinámico no las encuentra a menos que se lo digamos explícitamente acá.
-// Ojo: graphicsMode es una propiedad con setter, no un método — chromiumBinary.setGraphicsMode(false)
-// rompe el módulo entero al cargar (TypeError no capturado, crashea toda la función serverless).
-chromiumBinary.graphicsMode = false;
+// OJO: NO desactivar graphicsMode acá. Los flags de arranque de Chromium (--use-gl=angle
+// --use-angle=swiftshader) se agregan siempre sin importar graphicsMode (bug conocido de esta
+// versión de @sparticuz/chromium, ver github.com/Sparticuz/chromium/issues/247) — pero la
+// extracción de la librería swiftshader que esos flags necesitan SÍ depende de graphicsMode.
+// Desactivarlo deja a Chromium pidiendo una librería (libGLESv2.so) que nunca se extrajo, y
+// crashea al arrancar. Se deja graphicsMode en su default (true) a propósito.
 
 // Config del runtime serverless de Vercel: sin esto, maxDuration/memory de vercel.json solo
 // aplican si además está declarado acá (Vercel lee ambos, pero conviene que coincidan).
