@@ -23,6 +23,7 @@ const MAX_CTAS = 20;
 const CTA_MAX_LEN = 60;
 const NAV_TIMEOUT_MS = 20000;
 const NETWORK_IDLE_GRACE_MS = 5000;
+const DOM_EVIDENCE_TIMEOUT_MS = 8000;
 const AXE_TIMEOUT_MS = 15000;
 const SCREENSHOT_TIMEOUT_MS = 10000;
 const SCREENSHOT_BUCKET = "evidence-screenshots";
@@ -188,10 +189,22 @@ export default async function handler(req, res) {
     // nunca bloquea más de NETWORK_IDLE_GRACE_MS aunque el sitio nunca llegue a estar "idle".
     await page.waitForLoadState("networkidle", { timeout: NETWORK_IDLE_GRACE_MS }).catch(() => {});
 
-    // Estas dos son rápidas y confiables (evaluate/eval de solo lectura) — van en paralelo.
+    // page.evaluate()/$$eval() NO tienen timeout propio en Playwright — si el JS de la página
+    // (ej. stripe.com) satura el hilo principal del navegador, estas llamadas pueden colgarse
+    // indefinidamente sin que ningún límite posterior (axe/screenshot) llegue siquiera a correr.
     const [domEvidence, hrefs] = await Promise.all([
-      extractDomEvidence(page),
-      page.$$eval("a[href]", (as) => as.map((a) => a.getAttribute("href") || "")),
+      withTimeout(extractDomEvidence(page), DOM_EVIDENCE_TIMEOUT_MS, "extracción de DOM").catch((err) => {
+        console.error("inspect: extracción de DOM no terminó a tiempo", url, err.message);
+        return { title: null, metaDescription: null, headings: [], ctas: [] };
+      }),
+      withTimeout(
+        page.$$eval("a[href]", (as) => as.map((a) => a.getAttribute("href") || "")),
+        DOM_EVIDENCE_TIMEOUT_MS,
+        "extracción de links",
+      ).catch((err) => {
+        console.error("inspect: extracción de links no terminó a tiempo", url, err.message);
+        return [];
+      }),
     ]);
 
     // axe-core puede tardar mucho en un DOM grande/complejo — si se pasa del límite, seguimos
