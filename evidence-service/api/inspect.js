@@ -26,6 +26,10 @@ const NETWORK_IDLE_GRACE_MS = 5000;
 const DOM_EVIDENCE_TIMEOUT_MS = 8000;
 const AXE_TIMEOUT_MS = 15000;
 const SCREENSHOT_TIMEOUT_MS = 10000;
+// Presupuesto total para navegación + evidencia + axe + screenshot combinados, medido desde que
+// el navegador termina de lanzar. Deja margen dentro de los 60s de maxDuration (Hobby) para el
+// arranque de Chromium, la subida a Supabase Storage y la construcción de la respuesta.
+const GLOBAL_BUDGET_MS = 40000;
 const SCREENSHOT_BUCKET = "evidence-screenshots";
 
 const NON_PAGE_EXTENSIONS = /\.(pdf|jpg|jpeg|png|gif|svg|webp|zip|rar|mp4|mp3|css|js|ico|xml|json)$/i;
@@ -150,6 +154,7 @@ export default async function handler(req, res) {
   }
 
   let browser;
+  let hardTimeout;
   try {
     const executablePath = await chromiumBinary.executablePath();
     // El fix real del error "libnss3.so/libnspr4.so: cannot open shared object file": apuntar el
@@ -174,6 +179,19 @@ export default async function handler(req, res) {
       // consola/red (ej. stripe.com) al no drenarse el pipe activamente — contribuía a los timeouts.
       // Ya no hace falta: los crashes que buscaba diagnosticar se resolvieron por otra vía.
     });
+
+    // Red de seguridad final: los timeouts de arriba (withTimeout) hacen que NUESTRO código deje
+    // de esperar, pero no matan la operación de Playwright que quedó colgada de fondo — en
+    // páginas muy pesadas eso puede seguir consumiendo el resto del presupuesto igual, sobre todo
+    // con --single-process (que este paquete fuerza) donde el pipe de CDP puede quedar atascado.
+    // Forzar el cierre del navegador SÍ rechaza cualquier operación pendiente de Playwright.
+    let hardTimedOut = false;
+    hardTimeout = setTimeout(() => {
+      hardTimedOut = true;
+      console.error("inspect: excedió el presupuesto total, forzando cierre del navegador", url);
+      browser.close().catch(() => {});
+    }, GLOBAL_BUDGET_MS);
+
     // @axe-core/playwright necesita que la página venga de un BrowserContext explícito para
     // poder inyectar su script de análisis; browser.newPage() por sí solo no alcanza.
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -232,10 +250,17 @@ export default async function handler(req, res) {
       );
     });
 
-    await browser.close();
+    clearTimeout(hardTimeout);
+    if (hardTimedOut) {
+      // El navegador ya se cerró solo (por el timer). Cada paso de arriba ya cayó a su valor de
+      // respaldo por su propio catch — seguimos con lo que haya, en vez de tirar todo por la borda.
+      console.error("inspect: se completó con evidencia parcial tras el cierre forzado", url);
+    } else {
+      await browser.close();
+    }
     browser = undefined;
 
-    const screenshotUrl = await uploadScreenshot(screenshotBuffer);
+    const screenshotUrl = screenshotBuffer ? await uploadScreenshot(screenshotBuffer) : null;
 
     res.status(200).json({
       screenshotUrl,
@@ -253,6 +278,7 @@ export default async function handler(req, res) {
     console.error("inspect: fallo inspeccionando", url, err);
     res.status(500).json({ error: "No se pudo inspeccionar el sitio", detail: String(err?.message || err) });
   } finally {
+    if (hardTimeout) clearTimeout(hardTimeout);
     if (browser) await browser.close().catch(() => {});
   }
 }
