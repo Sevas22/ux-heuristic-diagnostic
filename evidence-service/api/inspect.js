@@ -225,17 +225,9 @@ export default async function handler(req, res) {
       }),
     ]);
 
-    // axe-core puede tardar mucho en un DOM grande/complejo — si se pasa del límite, seguimos
-    // sin violaciones de accesibilidad en vez de perder todo el informe por esto.
-    const axeResults = await withTimeout(new AxeBuilder({ page }).analyze(), AXE_TIMEOUT_MS, "axe-core").catch(
-      (err) => {
-        console.error("inspect: axe-core no terminó a tiempo", url, err.message);
-        return { violations: [] };
-      },
-    );
-
-    // Igual con el screenshot full-page: si una página muy larga tarda demasiado en renderizarse
-    // completa, nos conformamos con un screenshot del viewport visible en vez de nada.
+    // El screenshot va PRIMERO: le importa más al producto (descripción visual, PDF, confianza
+    // del usuario) que axe-core, que es solo un complemento. Si una página muy larga tarda
+    // demasiado en renderizarse completa, nos conformamos con un screenshot del viewport visible.
     const screenshotBuffer = await withTimeout(
       page.screenshot({ fullPage: true }),
       SCREENSHOT_TIMEOUT_MS,
@@ -249,6 +241,15 @@ export default async function handler(req, res) {
         () => null,
       );
     });
+
+    // axe-core puede tardar mucho en un DOM grande/complejo — si se pasa del límite, seguimos
+    // sin violaciones de accesibilidad en vez de perder todo el informe por esto.
+    const axeResults = await withTimeout(new AxeBuilder({ page }).analyze(), AXE_TIMEOUT_MS, "axe-core").catch(
+      (err) => {
+        console.error("inspect: axe-core no terminó a tiempo", url, err.message);
+        return { violations: [] };
+      },
+    );
 
     clearTimeout(hardTimeout);
     if (hardTimedOut) {
