@@ -23,9 +23,22 @@ const MAX_CTAS = 20;
 const CTA_MAX_LEN = 60;
 const NAV_TIMEOUT_MS = 20000;
 const NETWORK_IDLE_GRACE_MS = 5000;
+const AXE_TIMEOUT_MS = 15000;
+const SCREENSHOT_TIMEOUT_MS = 10000;
 const SCREENSHOT_BUCKET = "evidence-screenshots";
 
 const NON_PAGE_EXTENSIONS = /\.(pdf|jpg|jpeg|png|gif|svg|webp|zip|rar|mp4|mp3|css|js|ico|xml|json)$/i;
+
+// axe-core y el screenshot full-page pueden tardar mucho más de lo esperado en sitios pesados
+// (DOM grande, muchos iframes, páginas muy largas — ej. stripe.com) y agotar los 60s de la función
+// entera sin dejar rastro útil. Cada uno corre con su propio límite: si se pasa, seguimos con lo
+// que sí tenemos (evidencia parcial) en vez de que Vercel mate la función entera sin explicación.
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} superó ${ms}ms`)), ms)),
+  ]);
+}
 
 async function extractDomEvidence(page) {
   return page.evaluate(
@@ -175,14 +188,31 @@ export default async function handler(req, res) {
     // nunca bloquea más de NETWORK_IDLE_GRACE_MS aunque el sitio nunca llegue a estar "idle".
     await page.waitForLoadState("networkidle", { timeout: NETWORK_IDLE_GRACE_MS }).catch(() => {});
 
-    // Estas tres sí pueden ir en paralelo (evaluate/eval de solo lectura); el screenshot va
-    // aparte y después, para no competir por el mismo page mientras axe inyecta su script.
-    const [domEvidence, hrefs, axeResults] = await Promise.all([
+    // Estas dos son rápidas y confiables (evaluate/eval de solo lectura) — van en paralelo.
+    const [domEvidence, hrefs] = await Promise.all([
       extractDomEvidence(page),
       page.$$eval("a[href]", (as) => as.map((a) => a.getAttribute("href") || "")),
-      new AxeBuilder({ page }).analyze(),
     ]);
-    const screenshotBuffer = await page.screenshot({ fullPage: true });
+
+    // axe-core puede tardar mucho en un DOM grande/complejo — si se pasa del límite, seguimos
+    // sin violaciones de accesibilidad en vez de perder todo el informe por esto.
+    const axeResults = await withTimeout(new AxeBuilder({ page }).analyze(), AXE_TIMEOUT_MS, "axe-core").catch(
+      (err) => {
+        console.error("inspect: axe-core no terminó a tiempo", url, err.message);
+        return { violations: [] };
+      },
+    );
+
+    // Igual con el screenshot full-page: si una página muy larga tarda demasiado en renderizarse
+    // completa, nos conformamos con un screenshot del viewport visible en vez de nada.
+    const screenshotBuffer = await withTimeout(
+      page.screenshot({ fullPage: true }),
+      SCREENSHOT_TIMEOUT_MS,
+      "screenshot full-page",
+    ).catch(async (err) => {
+      console.error("inspect: screenshot full-page no terminó a tiempo, se usa solo el viewport", url, err.message);
+      return page.screenshot({ fullPage: false }).catch(() => null);
+    });
 
     await browser.close();
     browser = undefined;
