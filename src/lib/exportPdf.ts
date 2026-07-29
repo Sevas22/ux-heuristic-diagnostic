@@ -22,9 +22,12 @@ function sectionLabel(el: HTMLElement, index: number): string {
 
 // jsPDF embebe imágenes PNG como píxeles RGB sin comprimir dentro del PDF (no reusa la compresión
 // del propio PNG) — un screenshot de UI normal termina pesando varios MB por sección, y un informe
-// con ~20 secciones da un PDF de 60-90MB. JPEG sí comprime de verdad (DCTDecode); a calidad 0.92
-// se ve prácticamente igual para una captura de interfaz y pesa una fracción del tamaño.
-const JPEG_QUALITY = 0.92;
+// con ~20 secciones daba un PDF de 60-90MB. JPEG sí comprime de verdad (DCTDecode).
+const JPEG_QUALITY = 0.82;
+// El ancho útil de una A4 es ~540pt; capturar a escala 2 sobre un contenedor de 768px daba 1536px,
+// muy por encima de lo que una A4 puede mostrar (~1240px a 150 DPI) — solo inflaba el archivo.
+// A 1.5 se sigue viendo nítido en pantalla y en impresión, con ~44% menos de píxeles.
+const CAPTURE_SCALE = 1.5;
 
 function drawImage(pdf: jsPDF, imgData: string, x: number, y: number, w: number, h: number) {
   pdf.addImage(imgData, "JPEG", x, y, w, h);
@@ -81,7 +84,7 @@ export async function exportElementToPdf(
       // en vez de perder el PDF completo por una imagen o un SVG problemático.
       try {
         const canvas = await html2canvas(section, {
-          scale: 2,
+          scale: CAPTURE_SCALE,
           useCORS: true,
           backgroundColor: "#ffffff",
           ignoreElements: isUncapturableImage,

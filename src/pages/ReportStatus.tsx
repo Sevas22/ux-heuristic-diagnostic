@@ -10,6 +10,8 @@ import FindingCard from "@/components/report/FindingCard";
 import MermaidDiagram from "@/components/report/MermaidDiagram";
 import ReportCover from "@/components/report/ReportCover";
 import LighthouseScores from "@/components/report/LighthouseScores";
+import AccessibilityAudit from "@/components/report/AccessibilityAudit";
+import CapturedEvidencePanel from "@/components/report/CapturedEvidencePanel";
 import AnnotatedScreenshot from "@/components/report/AnnotatedScreenshot";
 import ReferenceComparison from "@/components/report/ReferenceComparison";
 import PriorityMatrix from "@/components/report/PriorityMatrix";
@@ -163,24 +165,12 @@ export default function ReportStatus() {
         />
       </div>
 
-      {data.screenshot_url && (
-        <div data-pdf-section>
-          <AnnotatedScreenshot
-            screenshotUrl={data.screenshot_url}
-            websiteUrl={data.website_url}
-            findings={findings}
-            alt={`Captura de ${data.website_url}`}
-          />
-        </div>
-      )}
+      <PartHeading
+        numeral="I"
+        title="Resumen y contexto"
+        description="Qué encontramos, con qué información partimos y cómo se evaluó."
+      />
 
-      {data.lighthouse && (
-        <div data-pdf-section>
-          <LighthouseScores lighthouse={data.lighthouse} />
-        </div>
-      )}
-
-      {/* 1. Resumen ejecutivo */}
       {data.executive_summary && (
         <Card data-pdf-section className="mb-6 shadow-card">
           <CardHeader>
@@ -247,18 +237,6 @@ export default function ReportStatus() {
         </Card>
       )}
 
-      {data.screenshot_url && data.reference_screenshots && data.reference_screenshots.length > 0 && (
-        <div data-pdf-section>
-          <ReferenceComparison
-            ownScreenshotUrl={data.screenshot_url}
-            ownWebsiteUrl={data.website_url}
-            references={data.reference_screenshots}
-            sectionNumber={nextSection()}
-          />
-        </div>
-      )}
-
-      {/* 2. Metodología */}
       {data.methodology && (
         <Card data-pdf-section className="mb-6 shadow-card">
           <CardHeader>
@@ -299,7 +277,61 @@ export default function ReportStatus() {
         </Card>
       )}
 
-      {/* 3. User Flow */}
+      <PartHeading
+        numeral="II"
+        title="Evidencia capturada"
+        description="Lo que se extrajo del sitio real con un navegador: captura, contenido y auditoría técnica. Es la base verificable de todo lo que sigue."
+      />
+
+      {data.screenshot_url && (
+        <div data-pdf-section>
+          <AnnotatedScreenshot
+            screenshotUrl={data.screenshot_url}
+            websiteUrl={data.website_url}
+            findings={findings}
+            alt={`Captura de ${data.website_url}`}
+          />
+        </div>
+      )}
+
+      {data.captured_evidence && (
+        <div data-pdf-section>
+          <CapturedEvidencePanel evidence={data.captured_evidence} sectionNumber={nextSection()} />
+        </div>
+      )}
+
+      {data.captured_evidence && data.captured_evidence.axe_violations.length > 0 && (
+        <div data-pdf-section>
+          <AccessibilityAudit
+            violations={data.captured_evidence.axe_violations}
+            sectionNumber={nextSection()}
+          />
+        </div>
+      )}
+
+      {data.lighthouse && (
+        <div data-pdf-section>
+          <LighthouseScores lighthouse={data.lighthouse} sectionNumber={nextSection()} />
+        </div>
+      )}
+
+      {data.screenshot_url && data.reference_screenshots && data.reference_screenshots.length > 0 && (
+        <div data-pdf-section>
+          <ReferenceComparison
+            ownScreenshotUrl={data.screenshot_url}
+            ownWebsiteUrl={data.website_url}
+            references={data.reference_screenshots}
+            sectionNumber={nextSection()}
+          />
+        </div>
+      )}
+
+      <PartHeading
+        numeral="III"
+        title="Recorrido y arquitectura"
+        description="Cómo está estructurado el sitio y qué camino recorre el usuario hacia el objetivo declarado."
+      />
+
       {userFlowChart && (
         <Card data-pdf-section className="mb-6 shadow-card">
           <CardHeader>
@@ -331,7 +363,27 @@ export default function ReportStatus() {
         </Card>
       )}
 
-      {/* 5. Tabla de hallazgos */}
+      {journeyChart && (
+        <Card data-pdf-section className="mb-6 shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <SectionNumber n={nextSection()} />
+              Journey del usuario
+            </CardTitle>
+            <CardDescription>Calidad percibida en cada etapa del recorrido, de 1 a 5.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MermaidDiagram chart={journeyChart} title="Journey del usuario" />
+          </CardContent>
+        </Card>
+      )}
+
+      <PartHeading
+        numeral="IV"
+        title="Hallazgos"
+        description="Cada problema detectado, con su severidad, el impacto en el usuario y la evidencia que lo respalda."
+      />
+
       {findings.length > 0 && (
         <Card data-pdf-section className="mb-6 shadow-card">
           <CardHeader>
@@ -339,6 +391,7 @@ export default function ReportStatus() {
               <SectionNumber n={nextSection()} />
               Tabla de hallazgos
             </CardTitle>
+            <CardDescription>Vista general de los {findings.length} hallazgos, ordenados por ID.</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <table className="w-full min-w-[560px] border-collapse text-left text-xs">
@@ -388,7 +441,12 @@ export default function ReportStatus() {
         ))}
       </div>
 
-      {/* 7. Matriz impacto vs severidad */}
+      <PartHeading
+        numeral="V"
+        title="Priorización"
+        description="Por dónde empezar: qué atacar primero según su severidad, su impacto y el esfuerzo que requiere."
+      />
+
       {findings.length > 0 && (
         <Card data-pdf-section className="mb-6 shadow-card">
           <CardHeader>
@@ -419,21 +477,6 @@ export default function ReportStatus() {
         </Card>
       )}
 
-      {/* 9. Journey del usuario */}
-      {journeyChart && (
-        <Card data-pdf-section className="mb-6 shadow-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <SectionNumber n={nextSection()} />
-              Journey del usuario
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MermaidDiagram chart={journeyChart} title="Journey del usuario" />
-          </CardContent>
-        </Card>
-      )}
-
       {priorityFlowchart && (
         <Card data-pdf-section className="mb-6 shadow-card">
           <CardHeader>
@@ -449,7 +492,12 @@ export default function ReportStatus() {
         </Card>
       )}
 
-      {/* 10. Conclusiones */}
+      <PartHeading
+        numeral="VI"
+        title="Conclusiones y plan de acción"
+        description="El resumen ejecutable: qué hacer esta semana, qué dejar para el próximo trimestre y qué se arriesga si no se hace nada."
+      />
+
       {data.conclusions && (
         <Card data-pdf-section className="mb-6 border-primary/30 bg-primary-soft/40 shadow-card">
           <CardHeader>
@@ -486,6 +534,18 @@ function SectionNumber({ n }: { n: number }) {
     <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
       {n}
     </span>
+  );
+}
+
+// Separador de bloque temático. El informe tiene ~17 secciones: sin agruparlas, la lectura era una
+// lista plana donde el análisis, la evidencia y los diagramas quedaban mezclados sin jerarquía.
+function PartHeading({ numeral, title, description }: { numeral: string; title: string; description: string }) {
+  return (
+    <div data-pdf-section className="mb-4 mt-10 border-t-2 border-primary/20 pt-5 first:mt-0">
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Parte {numeral}</p>
+      <h2 className="mt-1 text-xl font-extrabold">{title}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+    </div>
   );
 }
 

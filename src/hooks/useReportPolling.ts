@@ -82,6 +82,24 @@ export interface ReferenceScreenshot {
   screenshot_url: string;
 }
 
+export interface AxeViolation {
+  id: string;
+  impact: string;
+  description: string;
+  help: string;
+  helpUrl: string;
+  nodeCount: number;
+}
+
+/** Evidencia cruda capturada del sitio real por evidence-service (Playwright + axe-core). */
+export interface CapturedEvidence {
+  headings: string[];
+  ctas: string[];
+  axe_violations: AxeViolation[];
+  page_title: string | null;
+  meta_description: string | null;
+}
+
 export interface ReportRow {
   status: SubmissionStatus;
   website_url: string;
@@ -99,6 +117,7 @@ export interface ReportRow {
   conclusions: Conclusions | null;
   reference_screenshots: ReferenceScreenshot[] | null;
   lighthouse: LighthouseScores | null;
+  captured_evidence: CapturedEvidence | null;
   pdf_url: string | null;
   created_at: string | null;
 }

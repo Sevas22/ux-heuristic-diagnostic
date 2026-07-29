@@ -96,6 +96,60 @@ export async function inspectSite(url: string): Promise<SiteInspection> {
   }
 }
 
+// Lighthouse vía la API de PageSpeed Insights de Google: corre en la infraestructura de Google,
+// así que no compite por el presupuesto de tiempo de nuestras funciones (correrlo nosotros dentro
+// de una función serverless no entraba en el límite del plan gratuito de Vercel).
+const PAGESPEED_TIMEOUT_MS = 60000;
+
+export async function fetchLighthouse(url: string): Promise<LighthouseResult | null> {
+  const apiKey = Deno.env.get("PAGESPEED_API_KEY");
+  if (!apiKey) {
+    console.warn("fetchLighthouse: PAGESPEED_API_KEY no está configurado, se omiten las métricas");
+    return null;
+  }
+
+  const endpoint = new URL("https://www.googleapis.com/pagespeedonline/v5/runPagespeed");
+  endpoint.searchParams.set("url", url);
+  endpoint.searchParams.set("strategy", "desktop");
+  endpoint.searchParams.set("key", apiKey);
+  for (const category of ["performance", "accessibility", "seo", "best-practices"]) {
+    endpoint.searchParams.append("category", category);
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), PAGESPEED_TIMEOUT_MS);
+    const res = await fetch(endpoint, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      console.error(`fetchLighthouse: PageSpeed respondió ${res.status}`, await res.text());
+      return null;
+    }
+
+    const data = await res.json();
+    const categories = data?.lighthouseResult?.categories;
+    const audits = data?.lighthouseResult?.audits;
+    if (!categories) return null;
+
+    const toScore = (value: unknown) =>
+      typeof value === "number" ? Math.round(value * 100) : 0;
+
+    return {
+      performance: toScore(categories.performance?.score),
+      accessibility: toScore(categories.accessibility?.score),
+      seo: toScore(categories.seo?.score),
+      bestPractices: toScore(categories["best-practices"]?.score),
+      lcpMs: audits?.["largest-contentful-paint"]?.numericValue ?? null,
+      clsScore: audits?.["cumulative-layout-shift"]?.numericValue ?? null,
+      tbtMs: audits?.["total-blocking-time"]?.numericValue ?? null,
+    };
+  } catch (err) {
+    console.error("fetchLighthouse: no se pudo obtener métricas de PageSpeed", url, err);
+    return null;
+  }
+}
+
 export interface AccessibilityFinding {
   ruleId: string;
   criterion: string;

@@ -1,4 +1,3 @@
-import { Gauge } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { STATUS_COLORS, scoreStatus } from "@/lib/severity";
 import type { LighthouseScores as LighthouseScoresType } from "@/hooks/useReportPolling";
@@ -20,14 +19,26 @@ function ScoreTile({ label, score }: { label: string; score: number }) {
   );
 }
 
-export default function LighthouseScores({ lighthouse }: { lighthouse: LighthouseScoresType }) {
+export default function LighthouseScores({
+  lighthouse,
+  sectionNumber,
+}: {
+  lighthouse: LighthouseScoresType;
+  sectionNumber: number;
+}) {
   return (
     <Card className="mb-6 shadow-card">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <Gauge className="h-4 w-4 text-primary" /> Métricas técnicas (Lighthouse)
+          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+            {sectionNumber}
+          </span>
+          Métricas técnicas (Lighthouse)
         </CardTitle>
-        <CardDescription>Auditoría real ejecutada sobre la página de inicio, no estimada.</CardDescription>
+        <CardDescription>
+          Auditoría ejecutada por Google PageSpeed Insights sobre la página de inicio. Son mediciones
+          reales, no estimaciones.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

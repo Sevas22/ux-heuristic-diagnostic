@@ -1,6 +1,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { buildGroqMessages, buildVisualDescriptionMessages, parseGroqReport, type Finding } from "../_shared/groqPrompt.ts";
-import { inspectSite, violationsToAccessibilityFindings, type SiteInspection } from "../_shared/siteInspection.ts";
+import {
+  inspectSite,
+  fetchLighthouse,
+  violationsToAccessibilityFindings,
+  type SiteInspection,
+} from "../_shared/siteInspection.ts";
 import { pruneUnverifiedFindings, coherentScore, type EvidenceBundle } from "../_shared/reportValidator.ts";
 import { buildCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 
@@ -148,7 +153,12 @@ Deno.serve(async (req) => {
 
     try {
       // Inspección real de la home: screenshot, DOM renderizado (headings/CTAs) y axe-core.
-      const homeInspection = await inspectSite(submission.website_url);
+      // Lighthouse (vía PageSpeed) va en paralelo: es una espera de red larga contra un servicio
+      // externo, así que encadenarla sumaría ~30s al tiempo total sin ninguna necesidad.
+      const [homeInspection, lighthouse] = await Promise.all([
+        inspectSite(submission.website_url),
+        fetchLighthouse(submission.website_url),
+      ]);
 
       const internalLinks = homeInspection.internalLinks.slice(0, MAX_INTERNAL_PAGES);
       const internalInspections = await Promise.all(internalLinks.map((url) => inspectSite(url)));
@@ -260,7 +270,16 @@ Deno.serve(async (req) => {
         journey_map: report.journey_map,
         conclusions: report.conclusions,
         reference_screenshots: referenceScreenshots,
-        lighthouse: homeInspection.lighthouse,
+        lighthouse,
+        // Evidencia cruda capturada del sitio: es la parte más concreta y verificable del informe
+        // (antes solo alimentaba al modelo y se descartaba, así que el cliente nunca la veía).
+        captured_evidence: {
+          headings: homeInspection.headings,
+          ctas: homeInspection.ctas,
+          axe_violations: homeInspection.axeViolations,
+          page_title: homeInspection.title,
+          meta_description: homeInspection.metaDescription,
+        },
       });
 
       await supabase.from("submissions").update({ status: "ready" }).eq("id", submission.id);
