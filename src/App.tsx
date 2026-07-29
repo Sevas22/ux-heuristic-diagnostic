@@ -1,11 +1,15 @@
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import Landing from "@/pages/Landing";
 import IntakeForm from "@/pages/IntakeForm";
 import ReportStatus from "@/pages/ReportStatus";
 import NotFound from "@/pages/NotFound";
+import { reportHeightToParent } from "@/lib/iframeResize";
 
 function App() {
+  useEffect(() => reportHeightToParent(), []);
+
   return (
     <BrowserRouter>
       <Toaster />
