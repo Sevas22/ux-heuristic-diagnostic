@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import FindingCard from "@/components/report/FindingCard";
 import MermaidDiagram from "@/components/report/MermaidDiagram";
-import MetricsRow from "@/components/report/MetricsRow";
+import ReportCover from "@/components/report/ReportCover";
 import LighthouseScores from "@/components/report/LighthouseScores";
 import AnnotatedScreenshot from "@/components/report/AnnotatedScreenshot";
 import ReferenceComparison from "@/components/report/ReferenceComparison";
@@ -16,7 +16,7 @@ import PriorityMatrix from "@/components/report/PriorityMatrix";
 import StatusDot from "@/components/report/StatusDot";
 import { severityStatus, priorityStatus } from "@/lib/severity";
 import { buildFlowchart, buildNavGraph, buildPie, buildJourney, buildPriorityFlowchart } from "@/lib/mermaidBuilders";
-import { Loader2, Download, AlertTriangle, Target, CheckCircle2, XCircle, GitBranch } from "lucide-react";
+import { Loader2, Download, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 
 const SEVERITY_LEGEND = [
   { level: 0, label: "Sin problema" },
@@ -55,8 +55,11 @@ export default function ReportStatus() {
     setExportProgress(null);
     try {
       const domain = data.website_url.replace(/^https?:\/\//, "").replace(/\/$/, "");
-      await exportElementToPdf("report-content", `diagnostico-ux-${domain}.pdf`, (current, total) =>
-        setExportProgress({ current, total }),
+      await exportElementToPdf(
+        "report-content",
+        `diagnostico-ux-${domain}.pdf`,
+        (current, total) => setExportProgress({ current, total }),
+        `Diagnóstico UX/UI · ${domain}`,
       );
     } catch (err) {
       console.error(err);
@@ -128,6 +131,9 @@ export default function ReportStatus() {
     ? buildPriorityFlowchart({ critical: criticalCount, quickWins: quickWinsCount, highPriority: highPriorityCount })
     : null;
 
+  // Se recrea en cada render para que la numeración siempre empiece en 1.
+  const nextSection = createSectionCounter();
+
   return (
     <div id="report-content" className="container mx-auto max-w-3xl py-12 print:py-0">
       <div className="mb-8 flex items-start justify-between print:hidden">
@@ -145,6 +151,18 @@ export default function ReportStatus() {
         </Button>
       </div>
 
+      <div data-pdf-section>
+        <ReportCover
+          websiteUrl={data.website_url}
+          overallScore={data.overall_score ?? 0}
+          findingsCount={findings.length}
+          criticalCount={criticalCount}
+          quickWinsCount={quickWinsCount}
+          createdAt={data.created_at}
+          industry={data.industry}
+        />
+      </div>
+
       {data.screenshot_url && (
         <div data-pdf-section>
           <AnnotatedScreenshot
@@ -155,15 +173,6 @@ export default function ReportStatus() {
           />
         </div>
       )}
-
-      <div data-pdf-section>
-        <MetricsRow
-          overallScore={data.overall_score ?? 0}
-          findingsCount={findings.length}
-          criticalCount={criticalCount}
-          quickWinsCount={quickWinsCount}
-        />
-      </div>
 
       {data.lighthouse && (
         <div data-pdf-section>
@@ -176,7 +185,7 @@ export default function ReportStatus() {
         <Card data-pdf-section className="mb-6 shadow-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <SectionNumber n={1} />
+              <SectionNumber n={nextSection()} />
               Resumen ejecutivo
             </CardTitle>
             <CardDescription>{data.executive_summary.product_description}</CardDescription>
@@ -211,7 +220,8 @@ export default function ReportStatus() {
         <Card data-pdf-section className="mb-6 shadow-card">
           <CardHeader className="space-y-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <Target className="h-4 w-4 text-primary" /> Contexto que compartiste
+              <SectionNumber n={nextSection()} />
+              Contexto que compartiste
             </CardTitle>
             {data.industry && (
               <p className="text-sm text-muted-foreground">
@@ -243,6 +253,7 @@ export default function ReportStatus() {
             ownScreenshotUrl={data.screenshot_url}
             ownWebsiteUrl={data.website_url}
             references={data.reference_screenshots}
+            sectionNumber={nextSection()}
           />
         </div>
       )}
@@ -252,7 +263,7 @@ export default function ReportStatus() {
         <Card data-pdf-section className="mb-6 shadow-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <SectionNumber n={2} />
+              <SectionNumber n={nextSection()} />
               Metodología
             </CardTitle>
             <CardDescription>{data.methodology.criteria}</CardDescription>
@@ -293,7 +304,7 @@ export default function ReportStatus() {
         <Card data-pdf-section className="mb-6 shadow-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <SectionNumber n={3} />
+              <SectionNumber n={nextSection()} />
               User Flow
             </CardTitle>
             <CardDescription>Recorrido sugerido hacia el objetivo declarado.</CardDescription>
@@ -309,7 +320,7 @@ export default function ReportStatus() {
         <Card data-pdf-section className="mb-6 shadow-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <SectionNumber n={4} />
+              <SectionNumber n={nextSection()} />
               Arquitectura de navegación
             </CardTitle>
             <CardDescription>Mapa de las páginas reales analizadas.</CardDescription>
@@ -325,7 +336,7 @@ export default function ReportStatus() {
         <Card data-pdf-section className="mb-6 shadow-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <SectionNumber n={5} />
+              <SectionNumber n={nextSection()} />
               Tabla de hallazgos
             </CardTitle>
           </CardHeader>
@@ -365,7 +376,7 @@ export default function ReportStatus() {
       {/* 6. Fichas individuales por hallazgo */}
       {findings.length > 0 && (
         <div data-pdf-section className="mb-3 flex items-center gap-2">
-          <SectionNumber n={6} />
+          <SectionNumber n={nextSection()} />
           <h2 className="text-base font-semibold">Fichas individuales por hallazgo</h2>
         </div>
       )}
@@ -382,7 +393,7 @@ export default function ReportStatus() {
         <Card data-pdf-section className="mb-6 shadow-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <SectionNumber n={7} />
+              <SectionNumber n={nextSection()} />
               Matriz impacto vs severidad
             </CardTitle>
             <CardDescription>Priorización de los hallazgos.</CardDescription>
@@ -398,7 +409,7 @@ export default function ReportStatus() {
         <Card data-pdf-section className="mb-6 shadow-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <SectionNumber n={8} />
+              <SectionNumber n={nextSection()} />
               Distribución de problemas por heurística
             </CardTitle>
           </CardHeader>
@@ -413,7 +424,7 @@ export default function ReportStatus() {
         <Card data-pdf-section className="mb-6 shadow-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <SectionNumber n={9} />
+              <SectionNumber n={nextSection()} />
               Journey del usuario
             </CardTitle>
           </CardHeader>
@@ -427,7 +438,8 @@ export default function ReportStatus() {
         <Card data-pdf-section className="mb-6 shadow-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <GitBranch className="h-4 w-4 text-primary" /> Árbol de decisión: cómo priorizar
+              <SectionNumber n={nextSection()} />
+              Árbol de decisión: cómo priorizar
             </CardTitle>
             <CardDescription>El criterio que seguiríamos nosotros para triage, aplicado a tus propios números.</CardDescription>
           </CardHeader>
@@ -443,7 +455,7 @@ export default function ReportStatus() {
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-base">
               <span className="flex items-center gap-2">
-                <SectionNumber n={10} />
+                <SectionNumber n={nextSection()} />
                 Conclusiones
               </span>
               <span className="text-2xl font-extrabold text-primary">{data.conclusions.final_score}/100</span>
@@ -459,6 +471,14 @@ export default function ReportStatus() {
       )}
     </div>
   );
+}
+
+// Numerador de secciones: se incrementa SOLO cuando la sección efectivamente se renderiza. Antes
+// los números estaban hardcodeados (n={1}, n={2}...), así que cualquier informe al que le faltara
+// una sección condicional (user flow, arquitectura, journey...) mostraba huecos: 1, 2, 4, 5...
+function createSectionCounter() {
+  let n = 0;
+  return () => ++n;
 }
 
 function SectionNumber({ n }: { n: number }) {

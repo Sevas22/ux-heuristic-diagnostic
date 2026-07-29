@@ -1,11 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import type { ReferenceScreenshot } from "@/hooks/useReportPolling";
-import { Layers } from "lucide-react";
 
 interface ReferenceComparisonProps {
   ownScreenshotUrl: string;
   ownWebsiteUrl: string;
   references: ReferenceScreenshot[];
+  /** Número de sección, asignado por el informe para que la numeración sea continua. */
+  sectionNumber: number;
 }
 
 function Thumb({ screenshotUrl, url, label }: { screenshotUrl: string; url: string; label?: string }) {
@@ -22,14 +23,22 @@ function Thumb({ screenshotUrl, url, label }: { screenshotUrl: string; url: stri
   );
 }
 
-export default function ReferenceComparison({ ownScreenshotUrl, ownWebsiteUrl, references }: ReferenceComparisonProps) {
+export default function ReferenceComparison({
+  ownScreenshotUrl,
+  ownWebsiteUrl,
+  references,
+  sectionNumber,
+}: ReferenceComparisonProps) {
   if (references.length === 0) return null;
 
   return (
     <Card className="mb-6 shadow-card">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <Layers className="h-4 w-4 text-primary" /> Comparación visual
+          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+            {sectionNumber}
+          </span>
+          Comparación visual
         </CardTitle>
         <CardDescription>Tu sitio junto a las referencias que compartiste.</CardDescription>
       </CardHeader>

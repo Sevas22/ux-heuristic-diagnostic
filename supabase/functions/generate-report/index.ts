@@ -2,7 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { buildGroqMessages, buildVisualDescriptionMessages, parseGroqReport, type Finding } from "../_shared/groqPrompt.ts";
 import { inspectSite, violationsToAccessibilityFindings, type SiteInspection } from "../_shared/siteInspection.ts";
 import { pruneUnverifiedFindings, coherentScore, type EvidenceBundle } from "../_shared/reportValidator.ts";
-import { corsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
+import { buildCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -115,6 +115,8 @@ async function sendReportEmail(to: string, reportUrl: string, websiteUrl: string
 Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
   if (preflight) return preflight;
+
+  const corsHeaders = buildCorsHeaders(req);
 
   try {
     const { submissionId } = await req.json();

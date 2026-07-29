@@ -1,6 +1,6 @@
 import Stripe from "npm:stripe@17";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
+import { buildCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, {
   apiVersion: "2024-06-20",
@@ -17,6 +17,8 @@ const SITE_URL = Deno.env.get("SITE_URL")!;
 Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
   if (preflight) return preflight;
+
+  const corsHeaders = buildCorsHeaders(req);
 
   try {
     const { submissionId } = await req.json();

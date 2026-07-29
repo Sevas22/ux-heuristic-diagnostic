@@ -30,10 +30,25 @@ function drawImage(pdf: jsPDF, imgData: string, x: number, y: number, w: number,
   pdf.addImage(imgData, "JPEG", x, y, w, h);
 }
 
+// Pie de página en cada hoja: sin esto el PDF no tiene forma de saber de qué sitio es cada página
+// suelta, ni cuántas páginas son en total — algo que se espera de cualquier entregable formal.
+function drawFooters(pdf: jsPDF, label: string, pageWidth: number, pageHeight: number) {
+  const total = pdf.getNumberOfPages();
+  for (let page = 1; page <= total; page++) {
+    pdf.setPage(page);
+    pdf.setFontSize(8);
+    pdf.setTextColor(140);
+    // Va dentro del margen inferior, por debajo del área de contenido: nunca lo pisa.
+    pdf.text(label, MARGIN, pageHeight - 14);
+    pdf.text(`${page} / ${total}`, pageWidth - MARGIN, pageHeight - 14, { align: "right" });
+  }
+}
+
 export async function exportElementToPdf(
   containerId: string,
   filename: string,
   onProgress?: (current: number, total: number) => void,
+  footerLabel?: string,
 ): Promise<void> {
   const container = document.getElementById(containerId);
   if (!container) throw new Error(`No se encontró el elemento #${containerId}`);
@@ -107,6 +122,8 @@ export async function exportElementToPdf(
     if (skippedSections === sections.length) {
       throw new Error("No se pudo capturar ninguna sección del informe");
     }
+
+    if (footerLabel) drawFooters(pdf, footerLabel, pageWidth, pageHeight);
 
     pdf.save(filename);
   } finally {
