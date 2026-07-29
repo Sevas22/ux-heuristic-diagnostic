@@ -22,6 +22,7 @@ const MAX_HEADINGS = 20;
 const MAX_CTAS = 20;
 const CTA_MAX_LEN = 60;
 const NAV_TIMEOUT_MS = 20000;
+const NETWORK_IDLE_GRACE_MS = 5000;
 const SCREENSHOT_BUCKET = "evidence-screenshots";
 
 const NON_PAGE_EXTENSIONS = /\.(pdf|jpg|jpeg|png|gif|svg|webp|zip|rar|mp4|mp3|css|js|ico|xml|json)$/i;
@@ -166,9 +167,14 @@ export default async function handler(req, res) {
     const page = await context.newPage();
     page.setDefaultNavigationTimeout(NAV_TIMEOUT_MS);
 
-    await page
-      .goto(url, { waitUntil: "networkidle", timeout: NAV_TIMEOUT_MS })
-      .catch(() => page.goto(url, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT_MS }));
+    // domcontentloaded como estrategia principal: es rápido y predecible. "networkidle" como
+    // estrategia principal colgaba la navegación entera en sitios con analytics/chat en background
+    // que nunca dejan de hacer requests (ej. stripe.com), agotando el maxDuration de la función
+    // (60s en plan Hobby) antes de siquiera llegar a axe-core o al screenshot.
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT_MS });
+    // Margen corto y acotado para que termine de pintar contenido diferido — best-effort,
+    // nunca bloquea más de NETWORK_IDLE_GRACE_MS aunque el sitio nunca llegue a estar "idle".
+    await page.waitForLoadState("networkidle", { timeout: NETWORK_IDLE_GRACE_MS }).catch(() => {});
 
     // Estas tres sí pueden ir en paralelo (evaluate/eval de solo lectura); el screenshot va
     // aparte y después, para no competir por el mismo page mientras axe inyecta su script.
