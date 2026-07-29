@@ -25,7 +25,7 @@ const NAV_TIMEOUT_MS = 20000;
 const NETWORK_IDLE_GRACE_MS = 5000;
 const DOM_EVIDENCE_TIMEOUT_MS = 8000;
 const AXE_TIMEOUT_MS = 15000;
-const SCREENSHOT_TIMEOUT_MS = 10000;
+const SCREENSHOT_TIMEOUT_MS = 15000;
 // Presupuesto total para navegación + evidencia + axe + screenshot combinados, medido desde que
 // el navegador termina de lanzar. Deja margen dentro de los 60s de maxDuration (Hobby) para el
 // arranque de Chromium, la subida a Supabase Storage y la construcción de la respuesta.
@@ -226,20 +226,18 @@ export default async function handler(req, res) {
     ]);
 
     // El screenshot va PRIMERO: le importa más al producto (descripción visual, PDF, confianza
-    // del usuario) que axe-core, que es solo un complemento. Si una página muy larga tarda
-    // demasiado en renderizarse completa, nos conformamos con un screenshot del viewport visible.
+    // del usuario) que axe-core, que es solo un complemento. fullPage:true resultó poco confiable
+    // en páginas modernas largas (lazy-loading, animaciones, muchas imágenes) — hacía que incluso
+    // sitios de complejidad normal (no solo casos extremos como stripe.com) se quedaran sin
+    // screenshot. Un screenshot del viewport visible, real y a tiempo, vale más que uno completo
+    // que nunca llega.
     const screenshotBuffer = await withTimeout(
-      page.screenshot({ fullPage: true }),
+      page.screenshot({ fullPage: false }),
       SCREENSHOT_TIMEOUT_MS,
-      "screenshot full-page",
-    ).catch(async (err) => {
-      console.error("inspect: screenshot full-page no terminó a tiempo, se usa solo el viewport", url, err.message);
-      // Este intento de respaldo también necesita su propio límite: si el navegador quedó
-      // realmente trabado (no solo lento), un segundo intento sin timeout se cuelga igual de
-      // indefinido hasta que Vercel mata la función entera — exactamente lo que queremos evitar.
-      return withTimeout(page.screenshot({ fullPage: false }), SCREENSHOT_TIMEOUT_MS, "screenshot viewport").catch(
-        () => null,
-      );
+      "screenshot",
+    ).catch((err) => {
+      console.error("inspect: screenshot no terminó a tiempo", url, err.message);
+      return null;
     });
 
     // axe-core puede tardar mucho en un DOM grande/complejo — si se pasa del límite, seguimos
