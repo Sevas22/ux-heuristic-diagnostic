@@ -20,8 +20,14 @@ function sectionLabel(el: HTMLElement, index: number): string {
   return `#${index} "${heading?.textContent?.trim().slice(0, 40) ?? el.tagName}"`;
 }
 
+// jsPDF embebe imágenes PNG como píxeles RGB sin comprimir dentro del PDF (no reusa la compresión
+// del propio PNG) — un screenshot de UI normal termina pesando varios MB por sección, y un informe
+// con ~20 secciones da un PDF de 60-90MB. JPEG sí comprime de verdad (DCTDecode); a calidad 0.92
+// se ve prácticamente igual para una captura de interfaz y pesa una fracción del tamaño.
+const JPEG_QUALITY = 0.92;
+
 function drawImage(pdf: jsPDF, imgData: string, x: number, y: number, w: number, h: number) {
-  pdf.addImage(imgData, "PNG", x, y, w, h);
+  pdf.addImage(imgData, "JPEG", x, y, w, h);
 }
 
 export async function exportElementToPdf(
@@ -70,7 +76,7 @@ export async function exportElementToPdf(
         }
 
         const imgHeight = (canvas.height * usableWidth) / canvas.width;
-        const imgData = canvas.toDataURL("image/png");
+        const imgData = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
 
         if (imgHeight > usableHeight) {
           if (!isFirstDraw) pdf.addPage();
