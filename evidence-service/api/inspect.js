@@ -224,7 +224,12 @@ export default async function handler(req, res) {
       "screenshot full-page",
     ).catch(async (err) => {
       console.error("inspect: screenshot full-page no terminó a tiempo, se usa solo el viewport", url, err.message);
-      return page.screenshot({ fullPage: false }).catch(() => null);
+      // Este intento de respaldo también necesita su propio límite: si el navegador quedó
+      // realmente trabado (no solo lento), un segundo intento sin timeout se cuelga igual de
+      // indefinido hasta que Vercel mata la función entera — exactamente lo que queremos evitar.
+      return withTimeout(page.screenshot({ fullPage: false }), SCREENSHOT_TIMEOUT_MS, "screenshot viewport").catch(
+        () => null,
+      );
     });
 
     await browser.close();
