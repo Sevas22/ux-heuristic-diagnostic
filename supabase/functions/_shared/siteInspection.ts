@@ -191,6 +191,8 @@ export interface AccessibilityFinding {
   severity: number;
   description: string;
   recommendation: string;
+  /** Cuántos nodos del DOM incumplen la regla — dato medido por axe, no estimado. */
+  nodeCount: number;
 }
 
 const IMPACT_SEVERITY: Record<string, number> = {
@@ -214,5 +216,6 @@ export function violationsToAccessibilityFindings(violations: AxeViolation[]): A
       severity: IMPACT_SEVERITY[v.impact] ?? 2,
       description: `${v.description} (${v.nodeCount} elemento${v.nodeCount === 1 ? "" : "s"} afectado${v.nodeCount === 1 ? "" : "s"}).`,
       recommendation: `Ver la guía de la regla axe "${v.id}": ${v.helpUrl}`,
+      nodeCount: v.nodeCount,
     }));
 }

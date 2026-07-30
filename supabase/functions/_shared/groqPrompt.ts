@@ -48,6 +48,8 @@ export interface SubmissionForPrompt {
 export interface ExecutiveSummary {
   product_description: string;
   analysis_objective: string;
+  /** Frase de apertura para lectura directiva. Opcional: los informes previos no la tienen. */
+  headline?: string;
   general_assessment: string;
   strengths: string[];
   weaknesses: string[];
@@ -58,6 +60,13 @@ export interface Methodology {
   criteria: string;
 }
 
+/** Qué tan extendido está el problema dentro del sitio. */
+export const FREQUENCIES = ["Aislado", "Recurrente", "Sistémico"] as const;
+export type Frequency = (typeof FREQUENCIES)[number];
+/** Esfuerzo de implementación estimado por un equipo de producto. */
+export const EFFORTS = ["Bajo", "Medio", "Alto"] as const;
+export type Effort = (typeof EFFORTS)[number];
+
 export interface Finding {
   id: string;
   screen: string;
@@ -65,9 +74,16 @@ export interface Finding {
   severity: number;
   impact_score: number;
   description: string;
+  /** Causa raíz: por qué se produce, no solo qué se ve. */
+  root_cause: string;
   user_impact: string;
+  /** Consecuencia para el negocio, en términos defendibles (sin cifras inventadas). */
+  business_impact: string;
+  /** Recomendación a nivel de especificación: qué cambiar, dónde y con qué criterio. */
   recommendation: string;
   priority: "Alta" | "Media" | "Baja";
+  frequency: Frequency;
+  effort: Effort;
   zone: ScreenshotZone | null;
   evidence_ref: string;
 }
@@ -104,10 +120,37 @@ const SYSTEM_PROMPT = `Actúa como un consultor senior de UX/UI especializado en
 
 Objetivo: evaluar la calidad de la interfaz, detectar problemas de usabilidad, priorizarlos y proponer soluciones accionables para el equipo de producto y diseño. El informe debe parecer elaborado por un equipo senior de UX: lenguaje profesional y técnico, cada hallazgo justificado con evidencia visible en las capturas (nunca genérico), severidad asignada con criterio, y mejoras concretas y accionables.
 
+NIVEL DE PROFUNDIDAD ESPERADO (esto separa una auditoría de consultoría de una lista genérica):
+- Escribe como un consultor senior que debe defender cada afirmación frente al comité de dirección del cliente. Nada de obviedades ni de consejos que servirían para cualquier sitio del mundo.
+- "description" NO es "la página carece de jerarquía". Es qué elemento concreto, dónde, y qué principio de usabilidad se está incumpliendo.
+- "root_cause" explica POR QUÉ ocurre (decisión de diseño, patrón mal aplicado, falta de jerarquía visual, contenido que compite entre sí...), no repite el síntoma.
+- "business_impact" traduce el problema a consecuencia de negocio EN TÉRMINOS CUALITATIVOS DEFENDIBLES ligados al objetivo declarado por el cliente. Ejemplo válido: "El único camino hacia el contacto compite con otros tres elementos del mismo peso visual, así que la intención de conversión se diluye justo en el punto de decisión". PROHIBIDO inventar cifras: nunca escribas porcentajes de conversión, rebote, tiempos o cualquier número que no te hayamos dado como dato medido. No tenemos analítica del sitio; un número inventado destruye la credibilidad de todo el informe.
+- "recommendation" debe ser una ESPECIFICACIÓN ejecutable, no una intención. Mal: "mejorar el CTA". Bien: "un único CTA primario sobre el pliegue, con contraste mínimo 4.5:1, y degradar los otros dos enlaces de esa zona a estilo secundario para que no compitan". Di qué elemento, dónde, con qué jerarquía y bajo qué criterio verificable.
+- No compares con sitios que no estén en la lista de referencias que te dieron. Si tienes descripción visual de una referencia, la comparación debe apoyarse en ella; si no, no cites empresas ni "buenas prácticas del sector" como si las hubieras observado.
+
+EJEMPLO DEL NIVEL EXIGIDO. Este es el contraste entre un hallazgo inaceptable y uno aceptable:
+
+RECHAZADO (esto es lo que NO debes escribir — vale para cualquier sitio, no dice nada):
+  description: "La página de inicio es muy larga y contiene mucha información, lo que puede ser abrumador."
+  root_cause: "Falta de claridad en la jerarquía visual."
+  business_impact: "Puede obstaculizar la conversión de visitantes en contactos."
+  recommendation: "Reducir la cantidad de información y enfocarse en un llamado a la acción claro y prominente."
+Por qué se rechaza: "root_cause" repite el síntoma en vez de explicar la causa; nada cita elementos reales; la recomendación no dice qué elemento, dónde ni con qué criterio; se podría copiar y pegar en el informe de cualquier otro cliente.
+
+ACEPTADO (este es el nivel esperado — cita elementos reales y es ejecutable):
+  description: "En la franja superior conviven cuatro llamadas a la acción con el mismo peso visual ('Agenda tu diagnóstico', 'Ver servicios', 'Conoce al equipo' y el buscador), sin que ninguna destaque como acción principal. Incumple la heurística de diseño estético y minimalista: el usuario debe evaluar cuatro opciones antes de decidir."
+  root_cause: "Todas las secciones del sitio reclamaron presencia en el área superior y se resolvió dándoles el mismo tratamiento visual, en lugar de definir una única acción primaria alineada al objetivo de negocio."
+  business_impact: "El objetivo declarado es que más visitantes contacten, pero el camino hacia el contacto no tiene prioridad visual sobre alternativas que no convierten: la intención se dispersa justo en el punto de decisión."
+  recommendation: "Dejar 'Agenda tu diagnóstico' como único botón primario en la franja superior, con color de marca sólido y contraste mínimo 4.5:1. Degradar 'Ver servicios' y 'Conoce al equipo' a enlaces de texto secundarios, y mover el buscador al encabezado. Verificable: un solo elemento con relleno sólido por encima del pliegue."
+
+Aplica este nivel a TODOS los hallazgos. Si para un hallazgo no puedes escribir algo así de específico con la evidencia disponible, descártalo y genera uno del que sí puedas.
+
+LÍMITE DE LA ESPECIFICIDAD: "específico" significa describir el cambio en términos de lo que el usuario VE y de criterios verificables (posición respecto del pliegue, jerarquía entre elementos, ratio de contraste, cantidad de opciones simultáneas, orden de lectura). NO inventes detalles técnicos que no puedas conocer: nunca cites nombres de clases CSS, IDs, selectores, códigos hexadecimales de color, ni valores de padding o tipografía del sitio — no tenemos su código fuente. Escribe "el botón principal de la franja superior", no ".btn-primary"; escribe "contraste mínimo 4.5:1 sobre su fondo", no "color #0066CC".
+
 Reglas importantes:
 - No inventes pantallas ni pasos que no puedas justificar con las capturas o el contexto dado.
 - "screen" en cada hallazgo debe ser una de las URLs de páginas capturadas que se te dan, o "General" si el problema aplica a todo el sitio.
-- Genera entre 8 y 10 hallazgos en total (no es obligatorio un hallazgo por cada heurística; prioriza los problemas más importantes que detectes). Sé conciso en cada campo de texto: 1-2 frases por campo, sin relleno.
+- Genera entre 5 y 6 hallazgos, los más importantes. Vale mucho más un informe de 5 hallazgos con el nivel del EJEMPLO ACEPTADO que uno de 10 superficiales: la profundidad es el entregable, no la cantidad.
 - "user_flow" debe ser una secuencia ordenada usando ÚNICAMENTE URLs de las páginas capturadas que se te dieron (no inventes URLs nuevas), en el orden lógico en que un usuario las recorrería para lograr el objetivo declarado.
 - "zone" (solo para hallazgos donde "screen" es la página de inicio Y la descripción visual menciona claramente en qué parte de la pantalla está el problema): una de estas 9 zonas de un grid 3x3 sobre la captura: top-left, top-center, top-right, middle-left, middle-center, middle-right, bottom-left, bottom-center, bottom-right. Si no puedes ubicarlo con confianza en la descripción visual, o el hallazgo es de otra página o no es visual, pon "zone": null. No adivines.
 - "journey_map" debe basarse en las páginas y el objetivo reales; usa nombres de sección que describan lo que efectivamente se observa (ej. "Descubrimiento", "Evaluación", "Conversión"), no un flujo genérico de login/registro si no hay evidencia de eso en las capturas. El "score" de cada paso (1-5) es tu evaluación experta de qué tan bien resuelve esa etapa la interfaz.
@@ -122,48 +165,50 @@ REGLA DE EVIDENCIA (la más importante — un informe con hallazgos inventados n
 
 Escala de severidad por hallazgo: 0 = sin problema, 1 = cosmético, 2 = menor, 3 = importante, 4 = crítico.
 
-Responde ÚNICAMENTE con un objeto JSON con esta forma exacta, sin texto adicional:
+Escala de frecuencia ("frequency") — qué tan extendido está el problema:
+- "Aislado": ocurre en un punto concreto de una sola pantalla.
+- "Recurrente": se repite en varias secciones o pantallas.
+- "Sistémico": es un patrón transversal a todo el sitio (afecta el sistema de diseño, la navegación global o la estructura).
+
+Escala de esfuerzo ("effort") — costo de implementación para un equipo de producto:
+- "Bajo": cambio de copy, color, tamaño o posición de un elemento existente. Horas.
+- "Medio": rediseño de un componente o sección, o cambios que tocan varias pantallas. Días.
+- "Alto": requiere rediseño estructural, cambios de arquitectura de información o desarrollo nuevo. Semanas.
+Sé honesto con el esfuerzo: marcar todo como "Bajo" hace inútil la priorización.
+
+Responde ÚNICAMENTE con este JSON, sin texto adicional:
 {
-  "overall_score": number (0-100, salud general de UX/UI),
+  "overall_score": number 0-100,
   "executive_summary": {
-    "product_description": string (2-3 frases: qué es el producto, a qué se dedica),
-    "analysis_objective": string (1-2 frases, basado en el objetivo que dio el solicitante),
-    "general_assessment": string (3-5 frases de evaluación general),
-    "strengths": string[] (3-5 fortalezas concretas observadas),
-    "weaknesses": string[] (3-5 debilidades concretas observadas)
+    "product_description": string (2-3 frases: qué es el producto),
+    "analysis_objective": string (1-2 frases, según el objetivo del solicitante),
+    "headline": string (UNA frase para un director: problema dominante + consecuencia para su objetivo),
+    "general_assessment": string (3-5 frases para comité de dirección: estado, patrón de fondo, qué hay en juego),
+    "strengths": string[] (3-5), "weaknesses": string[] (3-5)
   },
-  "methodology": {
-    "flow_analyzed": string (1-2 frases describiendo qué flujo/recorrido se analizó entre las páginas capturadas),
-    "criteria": string (1-2 frases sobre los criterios de evaluación usados)
-  },
-  "findings": [
-    {
-      "id": string (formato "H-01", "H-02", ...),
-      "screen": string (una de las URLs capturadas, o "General"),
-      "heuristic": string (nombre exacto de una de las 10 heurísticas de Nielsen, en español),
-      "severity": number (0-4),
-      "impact_score": number (0-1, qué tanto afecta la conversión/tarea del usuario),
-      "description": string (hallazgo específico, citando algo real visible en la captura),
-      "user_impact": string (cómo afecta esto a un usuario real),
-      "recommendation": string (recomendación técnica concreta: qué cambiar y cómo),
-      "priority": "Alta" | "Media" | "Baja",
-      "zone": string | null (una de las 9 zonas del grid, o null — ver reglas arriba),
-      "evidence_ref": string (cita exacta a la evidencia real — ver REGLA DE EVIDENCIA arriba, formatos: "screenshot", "heading:<texto exacto>", "cta:<texto exacto>", "meta:title", "meta:description")
-    }
-  ],
-  "user_flow": string[] (URLs capturadas, en orden lógico hacia el objetivo del solicitante),
-  "journey_map": [
-    { "section": string, "steps": [ { "label": string, "score": number (1-5) } ] }
-  ],
+  "methodology": { "flow_analyzed": string, "criteria": string },
+  "findings": [{
+    "id": "H-01"..., "screen": string (URL capturada o "General"),
+    "heuristic": string (heurística de Nielsen exacta, en español),
+    "severity": number 0-4, "impact_score": number 0-1,
+    "description": string (2-3 frases: qué elemento falla, dónde, qué principio incumple),
+    "root_cause": string (1-2 frases: la decisión de diseño detrás, NUNCA el síntoma),
+    "user_impact": string (1-2 frases),
+    "business_impact": string (1-2 frases, cualitativo, SIN cifras),
+    "recommendation": string (2-3 frases, nivel especificación, criterio verificable),
+    "priority": "Alta"|"Media"|"Baja", "frequency": "Aislado"|"Recurrente"|"Sistémico",
+    "effort": "Bajo"|"Medio"|"Alto", "zone": string|null,
+    "evidence_ref": string (ver REGLA DE EVIDENCIA)
+  }],
+  "user_flow": string[] (URLs capturadas en orden lógico),
+  "journey_map": [{ "section": string, "steps": [{ "label": string, "score": number 1-5 }] }],
   "conclusions": {
-    "risks": string[] (2-4 riesgos si no se corrigen los problemas encontrados),
-    "quick_wins": string[] (3-5 mejoras de alto impacto y bajo esfuerzo, las primeras a atacar),
-    "mid_term": string[] (2-4 mejoras de mediano plazo),
-    "strategic_recommendations": string[] (2-3 recomendaciones estratégicas de más alto nivel),
-    "final_score": number (0-100, puede repetir overall_score)
+    "risks": string[] (2-4), "quick_wins": string[] (3-5),
+    "mid_term": string[] (2-4), "strategic_recommendations": string[] (2-3),
+    "final_score": number 0-100
   }
 }
-Las heurísticas de Nielsen son, en este orden: ${NIELSEN_HEURISTICS.join(", ")}.`;
+Heurísticas de Nielsen: ${NIELSEN_HEURISTICS.join(", ")}.`;
 
 const VISUAL_DESCRIPTION_SYSTEM_PROMPT =
   "Eres un analista de UX que describe capturas de pantalla de sitios web de forma objetiva y factual, en español, para que otro colega (que no puede ver la imagen) pueda auditar la usabilidad basándose en tu descripción. Divide tu descripción explícitamente en 3 franjas verticales — arriba, medio, abajo — y dentro de cada una menciona si algo relevante está a la izquierda, al centro o a la derecha (ej. 'Arriba, a la izquierda: el logo. Arriba, al centro: el menú de navegación.'). Cubre: layout, jerarquía visual, mensaje/propuesta de valor, elementos de navegación, llamadas a la acción, y cualquier problema visual obvio (inconsistencias, saturación, contraste, jerarquía confusa), siempre indicando la franja y el lado. Sé específico y concreto, no genérico. Responde solo con la descripción, en 200-280 palabras, sin JSON ni encabezados.";
@@ -285,6 +330,14 @@ export function parseGroqReport(raw: string): ParsedReport {
       throw new Error("Un elemento de findings no tiene la forma esperada (falta evidence_ref)");
     }
     f.zone = SCREENSHOT_ZONES.includes(f.zone) ? f.zone : null;
+
+    // Campos de análisis: si el modelo los omite o los devuelve fuera de escala, se normalizan en
+    // vez de tirar el informe entero. El valor por defecto es el más conservador de cada escala:
+    // asumir "Aislado"/"Medio" no infla la urgencia ni promete que el arreglo sea barato.
+    f.root_cause = typeof f.root_cause === "string" ? f.root_cause : "";
+    f.business_impact = typeof f.business_impact === "string" ? f.business_impact : "";
+    f.frequency = FREQUENCIES.includes(f.frequency) ? f.frequency : "Aislado";
+    f.effort = EFFORTS.includes(f.effort) ? f.effort : "Medio";
   }
 
   parsed.user_flow = toStringArray(parsed.user_flow);

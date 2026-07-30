@@ -6,6 +6,7 @@ export type SubmissionStatus = "draft" | "paid" | "generating" | "ready" | "fail
 export interface ExecutiveSummary {
   product_description: string;
   analysis_objective: string;
+  headline?: string;
   general_assessment: string;
   strengths: string[];
   weaknesses: string[];
@@ -30,6 +31,9 @@ export const SCREENSHOT_ZONES = [
 ] as const;
 export type ScreenshotZone = (typeof SCREENSHOT_ZONES)[number];
 
+export type Frequency = "Aislado" | "Recurrente" | "Sistémico";
+export type Effort = "Bajo" | "Medio" | "Alto";
+
 export interface Finding {
   id: string;
   screen: string;
@@ -42,6 +46,12 @@ export interface Finding {
   priority: "Alta" | "Media" | "Baja";
   zone: ScreenshotZone | null;
   evidence_ref: string;
+  // Campos de análisis añadidos después: los informes generados antes no los traen, por eso
+  // son opcionales y la UI los omite cuando faltan en vez de mostrar huecos vacíos.
+  root_cause?: string;
+  business_impact?: string;
+  frequency?: Frequency;
+  effort?: Effort;
 }
 
 export interface LighthouseScores {

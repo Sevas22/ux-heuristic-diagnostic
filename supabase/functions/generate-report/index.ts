@@ -17,7 +17,15 @@ const supabase = createClient(
 const MAX_INTERNAL_PAGES = 2;
 const MAX_REFERENCE_SCREENSHOTS = 2;
 const MIN_VERIFIED_FINDINGS = 4;
-const GROQ_TEXT_MODEL = "llama-3.3-70b-versatile";
+// llama-3.3-70b no seguía las instrucciones de profundidad: devolvía causas raíz que repetían el
+// síntoma ("la causa es la falta de jerarquía" para un problema de jerarquía) y recomendaciones
+// genéricas, incluso con ejemplos explícitos en el prompt. gpt-oss-120b sí produce el análisis a
+// nivel consultoría. Es un modelo de razonamiento: consume tokens extra pensando, y el límite del
+// plan gratuito de Groq es 8000 por minuto, de ahí reasoning_effort bajo y el tope de salida.
+const GROQ_TEXT_MODEL = "openai/gpt-oss-120b";
+// El prompt ronda los 4300 tokens (sistema + evidencia real del sitio) y el techo de Groq gratis
+// es 8000 por minuto contando entrada y salida, así que este es el margen real disponible.
+const GROQ_TEXT_MAX_TOKENS = 3500;
 // Groq retiró los modelos de visión llama-4-scout/maverick de su catálogo;
 // qwen3.6-27b es, al momento de escribir esto, el único modelo con soporte de imágenes disponible.
 // Si esto vuelve a fallar con 404 "model_not_found", revisar el catálogo vigente en
@@ -27,8 +35,9 @@ const GROQ_VISION_MODEL = "qwen/qwen3.6-27b";
 async function callGroq(
   messages: unknown[],
   model: string,
-  options: { json?: boolean; maxTokens: number },
-) {
+  options: { json?: boolean; maxTokens: number; reasoningEffort?: "low" | "medium" | "high" },
+  retryOnRateLimit = true,
+): Promise<string> {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -39,13 +48,28 @@ async function callGroq(
       model,
       messages,
       ...(options.json ? { response_format: { type: "json_object" } } : {}),
+      ...(options.reasoningEffort ? { reasoning_effort: options.reasoningEffort } : {}),
       temperature: 0.3,
       max_tokens: options.maxTokens,
     }),
   });
 
   if (!res.ok) {
-    throw new Error(`Groq respondió ${res.status}: ${await res.text()}`);
+    const body = await res.text();
+
+    // El plan gratuito de Groq permite 8000 tokens por minuto: dos informes generados con poco
+    // margen entre sí agotan la ventana y el segundo falla. Groq indica cuántos segundos faltan
+    // para que se libere, así que se espera ese tiempo y se reintenta una vez en lugar de perder
+    // el informe entero (que para el usuario ya significó minutos de espera).
+    if (res.status === 429 && retryOnRateLimit) {
+      const waitSeconds = Number(body.match(/try again in ([\d.]+)s/i)?.[1] ?? 0);
+      const waitMs = Math.min(Math.ceil((waitSeconds + 1) * 1000), 65000);
+      console.warn(`callGroq: límite de tasa alcanzado, reintentando en ${waitMs}ms`);
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      return callGroq(messages, model, options, false);
+    }
+
+    throw new Error(`Groq respondió ${res.status}: ${body}`);
   }
 
   const data = await res.json();
@@ -66,7 +90,7 @@ async function describeScreenshot(screenshotUrl: string): Promise<string | null>
 // Si Groq cita evidencia que no pudimos verificar contra el bundle real, le damos UNA oportunidad
 // de corregirse (Groq es gratis, el reintento no cuesta nada) antes de conformarnos con lo verificado.
 async function generateVerifiedReport(messages: unknown[], evidenceBundle: EvidenceBundle) {
-  let raw = await callGroq(messages, GROQ_TEXT_MODEL, { json: true, maxTokens: 4500 });
+  let raw = await callGroq(messages, GROQ_TEXT_MODEL, { json: true, maxTokens: GROQ_TEXT_MAX_TOKENS, reasoningEffort: "low" });
   let report = parseGroqReport(raw);
   let pruneResult = pruneUnverifiedFindings(report.findings, evidenceBundle);
 
@@ -83,7 +107,7 @@ async function generateVerifiedReport(messages: unknown[], evidenceBundle: Evide
       },
     ];
     try {
-      const retryRaw = await callGroq(retryMessages, GROQ_TEXT_MODEL, { json: true, maxTokens: 4500 });
+      const retryRaw = await callGroq(retryMessages, GROQ_TEXT_MODEL, { json: true, maxTokens: GROQ_TEXT_MAX_TOKENS, reasoningEffort: "low" });
       const retryReport = parseGroqReport(retryRaw);
       const retryPrune = pruneUnverifiedFindings(retryReport.findings, evidenceBundle);
       if (retryPrune.kept.length > pruneResult.kept.length) {
@@ -228,9 +252,20 @@ Deno.serve(async (req) => {
         severity: check.severity,
         impact_score: Math.min(check.severity / 4, 1),
         description: `${check.criterion}: ${check.description}`,
+        root_cause:
+          "La regla WCAG se incumple en el marcado de la página: el elemento no expone la semántica o el contraste que las tecnologías de asistencia necesitan para interpretarlo.",
         user_impact: "Puede excluir a usuarios que dependen de lectores de pantalla, navegación por teclado o zoom.",
+        business_impact:
+          "Reduce el alcance del sitio entre usuarios con discapacidad y es exigible por normativa de accesibilidad en la mayoría de mercados.",
         recommendation: check.recommendation,
         priority: (check.severity >= 3 ? "Alta" : check.severity === 2 ? "Media" : "Baja") as "Alta" | "Media" | "Baja",
+        // axe cuenta exactamente cuántos nodos del DOM incumplen cada regla, así que la frecuencia
+        // acá no es una estimación: sale del dato medido.
+        frequency: (check.nodeCount > 10 ? "Sistémico" : check.nodeCount > 2 ? "Recurrente" : "Aislado") as
+          | "Sistémico"
+          | "Recurrente"
+          | "Aislado",
+        effort: (check.severity >= 3 ? "Medio" : "Bajo") as "Medio" | "Bajo",
         zone: null,
         evidence_ref: `axe:${check.ruleId}`,
       }));

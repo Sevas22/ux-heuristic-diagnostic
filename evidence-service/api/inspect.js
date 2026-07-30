@@ -4,6 +4,7 @@ import { AxeBuilder } from "@axe-core/playwright";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import fs from "node:fs";
 
 // OJO: NO desactivar graphicsMode acá. Los flags de arranque de Chromium (--use-gl=angle
 // --use-angle=swiftshader) se agregan siempre sin importar graphicsMode (bug conocido de esta
@@ -103,6 +104,33 @@ function extractInternalLinks(hrefs, baseUrl, limit) {
   return links;
 }
 
+// Vercel reutiliza la misma instancia entre invocaciones y su /tmp es pequeño y compartido.
+// Playwright deja un directorio de artefactos y un perfil de navegador por ejecución, y nadie los
+// borra: tras suficientes informes el disco se llena y Chromium ya no arranca
+// ("ENOSPC: no space left on device"), rompiendo el servicio de forma permanente hasta que Vercel
+// recicle la instancia. Se barren antes de cada lanzamiento.
+// NO se toca /tmp/chromium ni /tmp/al2023: son el binario y las librerías extraídas, cuya
+// re-extracción cuesta varios segundos en cada arranque en frío.
+const TMP_DISPOSABLE = /^(playwright-artifacts-|playwright_chromium|core\.|chromium-pack)/;
+
+function cleanupTmp() {
+  let removed = 0;
+  try {
+    for (const entry of fs.readdirSync("/tmp")) {
+      if (!TMP_DISPOSABLE.test(entry)) continue;
+      try {
+        fs.rmSync(path.join("/tmp", entry), { recursive: true, force: true });
+        removed++;
+      } catch {
+        // Puede estar en uso por otra invocación concurrente; no es motivo para abortar.
+      }
+    }
+  } catch (err) {
+    console.error("cleanupTmp: no se pudo listar /tmp", err.message);
+  }
+  if (removed > 0) console.log(`cleanupTmp: se liberaron ${removed} directorios temporales`);
+}
+
 function mapAxeViolations(violations) {
   return violations.map((v) => ({
     id: v.id,
@@ -156,6 +184,7 @@ export default async function handler(req, res) {
   let browser;
   let hardTimeout;
   try {
+    cleanupTmp();
     const executablePath = await chromiumBinary.executablePath();
     // El fix real del error "libnss3.so/libnspr4.so: cannot open shared object file": apuntar el
     // linker dinámico a las carpetas donde @sparticuz/chromium extrae el binario y sus .so
@@ -279,5 +308,8 @@ export default async function handler(req, res) {
   } finally {
     if (hardTimeout) clearTimeout(hardTimeout);
     if (browser) await browser.close().catch(() => {});
+    // Segundo barrido: browser.close() no siempre borra el perfil ni los artefactos, y dejarlos
+    // acumulados es lo que terminaba llenando /tmp.
+    cleanupTmp();
   }
 }

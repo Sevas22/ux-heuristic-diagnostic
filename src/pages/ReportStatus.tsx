@@ -12,6 +12,8 @@ import ReportCover from "@/components/report/ReportCover";
 import LighthouseScores from "@/components/report/LighthouseScores";
 import AccessibilityAudit from "@/components/report/AccessibilityAudit";
 import CapturedEvidencePanel from "@/components/report/CapturedEvidencePanel";
+import UxScorecard, { buildCategoryScores } from "@/components/report/UxScorecard";
+import ImpactEffortPlan from "@/components/report/ImpactEffortPlan";
 import AnnotatedScreenshot from "@/components/report/AnnotatedScreenshot";
 import ReferenceComparison from "@/components/report/ReferenceComparison";
 import PriorityMatrix from "@/components/report/PriorityMatrix";
@@ -134,6 +136,7 @@ export default function ReportStatus() {
     : null;
 
   const lighthouse = normalizeLighthouse(data.lighthouse);
+  const categoryScores = buildCategoryScores(findings, lighthouse);
 
   // Se recrea en cada render para que la numeración siempre empiece en 1.
   const nextSection = createSectionCounter();
@@ -180,6 +183,12 @@ export default function ReportStatus() {
             <CardDescription>{data.executive_summary.product_description}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
+            {/* Lo primero que lee un directivo: el diagnóstico en una frase, destacado del cuerpo. */}
+            {data.executive_summary.headline && (
+              <p className="border-l-4 border-primary bg-primary-soft/30 py-2 pl-3 text-base font-semibold leading-snug text-foreground">
+                {data.executive_summary.headline}
+              </p>
+            )}
             <p><span className="font-medium text-foreground">Objetivo del análisis: </span>{data.executive_summary.analysis_objective}</p>
             <p className="text-muted-foreground">{data.executive_summary.general_assessment}</p>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -234,6 +243,16 @@ export default function ReportStatus() {
             )}
           </CardHeader>
         </Card>
+      )}
+
+      {categoryScores.length > 0 && (
+        <div data-pdf-section>
+          <UxScorecard
+            categories={categoryScores}
+            overallScore={data.overall_score ?? 0}
+            sectionNumber={nextSection()}
+          />
+        </div>
       )}
 
       {data.methodology && (
@@ -402,6 +421,8 @@ export default function ReportStatus() {
                   <th className="py-2 pr-3">Heurística</th>
                   <th className="py-2 pr-3">Severidad</th>
                   <th className="py-2 pr-3">Prioridad</th>
+                  <th className="py-2 pr-3">Frecuencia</th>
+                  <th className="py-2 pr-3">Esfuerzo</th>
                   <th className="py-2">Problema</th>
                 </tr>
               </thead>
@@ -417,6 +438,8 @@ export default function ReportStatus() {
                     <td className="py-2 pr-3">
                       <StatusDot status={priorityStatus(f.priority)} label={f.priority} />
                     </td>
+                    <td className="py-2 pr-3 text-muted-foreground">{f.frequency ?? "—"}</td>
+                    <td className="py-2 pr-3 text-muted-foreground">{f.effort ?? "—"}</td>
                     <td className="py-2 text-muted-foreground">{f.description}</td>
                   </tr>
                 ))}
@@ -452,6 +475,12 @@ export default function ReportStatus() {
         title="Priorización"
         description="Por dónde empezar: qué atacar primero según su severidad, su impacto y el esfuerzo que requiere."
       />
+
+      {findings.length > 0 && (
+        <div data-pdf-section>
+          <ImpactEffortPlan findings={findings} sectionNumber={nextSection()} />
+        </div>
+      )}
 
       {findings.length > 0 && (
         <Card data-pdf-section className="mb-6 shadow-card">

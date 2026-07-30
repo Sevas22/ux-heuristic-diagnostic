@@ -11,8 +11,20 @@ export interface EvidenceBundle {
   visualDescription: string | null;
 }
 
+// La comparación existe para detectar citas INVENTADAS, no para castigar diferencias de tipografía.
+// Los CTAs reales traen emoji, tildes y mayúsculas ("🔍 DIAGNÓSTICO SEO-GEO") que el modelo
+// reproduce de forma aproximada; comparar en crudo descartaba hallazgos legítimos por una tilde.
+// Se normaliza a letras y números sin acentos para que solo sobreviva la diferencia real de fondo.
 function normalize(text: string): string {
-  return text.trim().toLowerCase();
+  return text
+    .normalize("NFD")
+    // Marcas diacríticas combinantes (U+0300–U+036F): escritas con \u para que el rango no se
+    // corrompa al guardar el archivo con otra codificación.
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function verifyEvidenceRef(ref: string, bundle: EvidenceBundle): boolean {
@@ -38,11 +50,14 @@ function verifyEvidenceRef(ref: string, bundle: EvidenceBundle): boolean {
 // El modelo a veces "decora" un hallazgo genérico con una cita entre comillas que suena real
 // pero no lo es. Cualquier texto citado debe aparecer literalmente en la evidencia real que le dimos.
 function verifyQuotedText(text: string, bundle: EvidenceBundle): boolean {
-  const haystack = [...bundle.headings, ...bundle.ctas, bundle.visualDescription ?? ""]
-    .join(" \n ")
-    .toLowerCase();
+  const haystack = normalize(
+    [...bundle.headings, ...bundle.ctas, bundle.metaTitle ?? "", bundle.metaDescription ?? "", bundle.visualDescription ?? ""].join(" \n "),
+  );
 
-  const quotes = [...text.matchAll(/["“]([^"”]{4,80})["”]/g)].map((m) => m[1].toLowerCase());
+  const quotes = [...text.matchAll(/["“]([^"”]{4,80})["”]/g)]
+    .map((m) => normalize(m[1]))
+    .filter((q) => q.length >= 4);
+
   return quotes.every((q) => haystack.includes(q));
 }
 
