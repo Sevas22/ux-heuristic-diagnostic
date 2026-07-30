@@ -17,9 +17,10 @@ import ImpactEffortPlan from "@/components/report/ImpactEffortPlan";
 import AnnotatedScreenshot from "@/components/report/AnnotatedScreenshot";
 import ReferenceComparison from "@/components/report/ReferenceComparison";
 import PriorityMatrix from "@/components/report/PriorityMatrix";
+import JourneyMap from "@/components/report/JourneyMap";
 import StatusDot from "@/components/report/StatusDot";
 import { severityStatus, priorityStatus } from "@/lib/severity";
-import { buildFlowchart, buildNavGraph, buildPie, buildJourney, buildPriorityFlowchart } from "@/lib/mermaidBuilders";
+import { buildFlowchart, buildNavGraph, buildPie, buildPriorityFlowchart } from "@/lib/mermaidBuilders";
 import { Loader2, Download, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 
 const SEVERITY_LEGEND = [
@@ -127,7 +128,6 @@ export default function ReportStatus() {
   const userFlowChart = data.user_flow ? buildFlowchart(data.user_flow, data.goal) : null;
   const navGraphChart = data.navigation_graph ? buildNavGraph(data.navigation_graph) : null;
   const pieChart = buildPie(heuristicCounts);
-  const journeyChart = data.journey_map ? buildJourney(data.journey_map) : null;
   const criticalCount = findings.filter((f) => f.severity === 4).length;
   const quickWinsCount = data.conclusions?.quick_wins.length ?? 0;
   const highPriorityCount = findings.filter((f) => f.priority === "Alta").length;
@@ -382,17 +382,20 @@ export default function ReportStatus() {
         </Card>
       )}
 
-      {journeyChart && (
+      {data.journey_map && data.journey_map.length > 0 && (
         <Card data-pdf-section className="mb-6 shadow-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <SectionNumber n={nextSection()} />
               Journey del usuario
             </CardTitle>
-            <CardDescription>Calidad percibida en cada etapa del recorrido, de 1 a 5.</CardDescription>
+            <CardDescription>
+              Calidad percibida en cada etapa del recorrido, de 1 a 5. La caída de la curva marca
+              dónde se pierde al usuario.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <MermaidDiagram chart={journeyChart} title="Journey del usuario" />
+            <JourneyMap sections={data.journey_map} />
           </CardContent>
         </Card>
       )}

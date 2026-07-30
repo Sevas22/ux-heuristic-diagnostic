@@ -133,21 +133,6 @@ export function buildPriorityFlowchart(counts: PriorityFlowchartCounts): string 
   ].join("\n");
 }
 
-export function buildJourney(sections: JourneySection[]): string | null {
-  const validSections = sections.filter((s) => s.steps.length > 0);
-  if (validSections.length === 0) return null;
-
-  const lines = ["journey", "title Experiencia del usuario"];
-  for (const section of validSections) {
-    lines.push(`section ${sanitizeMermaidLabel(section.section, 40)}`);
-    for (const step of section.steps) {
-      const score = Math.min(Math.max(Math.round(step.score), 1), 5);
-      // El diagrama solo dibuja una carita según el score; sin el número al lado se pierde la
-      // precisión (una carita "media" no dice si es 2 o 3), así que lo dejamos explícito en el label.
-      const label = sanitizeMermaidLabel(step.label, 34);
-      lines.push(`${label} (${score}/5): ${score}`);
-    }
-  }
-
-  return lines.join("\n");
-}
+// El journey se dibuja ahora con el componente JourneyMap (SVG propio). El diagrama "journey" de
+// Mermaid quedaba con caritas emoji, un hueco vertical enorme y el puntaje embutido en la etiqueta,
+// sin forma de mostrar la curva de la experiencia — que es justamente lo que hace útil al gráfico.
