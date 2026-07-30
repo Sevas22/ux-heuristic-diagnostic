@@ -21,14 +21,38 @@ import { supabase } from "@/lib/supabaseClient";
 import { toast } from "@/components/ui/sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
 
+// La industria orienta el análisis del agente (qué patrones y expectativas son propios del sector),
+// así que conviene que el usuario encuentre la suya en vez de caer siempre en "Otra".
 const INDUSTRIES = [
   "E-commerce / Retail",
+  "Marketplace",
   "SaaS / Software",
   "Fintech / Servicios financieros",
-  "Salud",
-  "Educación",
+  "Seguros",
+  "Criptomonedas / Web3",
+  "Salud / Bienestar",
+  "Educación / EdTech",
   "Medios / Contenido",
+  "Entretenimiento / Streaming",
+  "Videojuegos",
   "Servicios profesionales",
+  "Agencia / Marketing",
+  "Legal",
+  "Recursos humanos / Empleo",
+  "Inmobiliaria / PropTech",
+  "Construcción / Arquitectura",
+  "Turismo / Hotelería",
+  "Restaurantes / Delivery",
+  "Moda / Belleza",
+  "Deportes / Fitness",
+  "Automotriz / Movilidad",
+  "Logística / Transporte",
+  "Manufactura / Industrial",
+  "Agro / Alimentación",
+  "Energía / Servicios públicos",
+  "Telecomunicaciones",
+  "ONG / Fundaciones",
+  "Gobierno / Sector público",
   "Otra",
 ];
 

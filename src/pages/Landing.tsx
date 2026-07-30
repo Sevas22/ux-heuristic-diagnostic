@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Sparkles, Globe, Zap } from "lucide-react";
 
 const STEPS = [
@@ -43,9 +42,6 @@ export default function Landing() {
       </header>
 
       <section className="container mx-auto flex flex-col items-center gap-6 py-20 text-center">
-        <Badge variant="secondary" className="gap-1">
-          <Sparkles className="h-3.5 w-3.5" /> Generado con IA
-        </Badge>
         <h1 className="max-w-3xl text-4xl font-extrabold leading-tight md:text-5xl">
           Diagnóstico UX/UI heurístico para tu producto digital, en minutos
         </h1>
