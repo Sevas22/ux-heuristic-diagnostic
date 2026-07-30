@@ -140,11 +140,8 @@ export default function ReportStatus() {
 
   return (
     <div id="report-content" className="container mx-auto max-w-3xl py-12 print:py-0">
-      <div className="mb-8 flex items-start justify-between print:hidden">
-        <div>
-          <h1 className="text-2xl font-extrabold">Diagnóstico UX/UI</h1>
-          <p className="text-muted-foreground">{data.website_url}</p>
-        </div>
+      {/* El título y el dominio los muestra la portada; acá solo va la acción, para no repetirlos. */}
+      <div className="mb-4 flex justify-end print:hidden">
         <Button variant="outline" onClick={handleExportPdf} disabled={exporting}>
           {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           {exporting
@@ -292,6 +289,7 @@ export default function ReportStatus() {
             websiteUrl={data.website_url}
             findings={findings}
             alt={`Captura de ${data.website_url}`}
+            sectionNumber={nextSection()}
           />
         </div>
       )}
@@ -430,9 +428,15 @@ export default function ReportStatus() {
 
       {/* 6. Fichas individuales por hallazgo */}
       {findings.length > 0 && (
-        <div data-pdf-section className="mb-3 flex items-center gap-2">
-          <SectionNumber n={nextSection()} />
-          <h2 className="text-base font-semibold">Fichas individuales por hallazgo</h2>
+        <div data-pdf-section className="mb-3 mt-6">
+          <div className="flex items-center gap-2">
+            <SectionNumber n={nextSection()} />
+            <h3 className="text-base font-semibold">Fichas individuales por hallazgo</h3>
+          </div>
+          <p className="mt-1 pl-7 text-sm text-muted-foreground">
+            El detalle de cada hallazgo: qué se observó, cómo afecta al usuario, qué hacer y sobre qué
+            evidencia se sostiene.
+          </p>
         </div>
       )}
       <div className="mb-6 space-y-4">
