@@ -156,8 +156,10 @@ async function fetchLighthouseStrategy(
   }
 }
 
-// Las dos estrategias van en paralelo: son esperas de red contra Google, encadenarlas duplicaría
-// el tiempo sin ninguna necesidad. Si una falla, la otra igual se muestra.
+// Las dos estrategias arrancan en paralelo (son esperas de red contra Google; encadenarlas
+// duplicaría el tiempo). Pero lanzarlas simultáneamente desde la IP compartida de Supabase hace
+// que PageSpeed rechace una de las dos de forma intermitente, así que la que falle se reintenta
+// una vez por separado — ahí ya no compite con la otra y suele pasar sin problema.
 export async function fetchLighthouse(url: string): Promise<LighthouseReport | null> {
   const apiKey = Deno.env.get("PAGESPEED_API_KEY");
   if (!apiKey) {
@@ -165,10 +167,19 @@ export async function fetchLighthouse(url: string): Promise<LighthouseReport | n
     return null;
   }
 
-  const [mobile, desktop] = await Promise.all([
+  let [mobile, desktop] = await Promise.all([
     fetchLighthouseStrategy(url, "mobile", apiKey),
     fetchLighthouseStrategy(url, "desktop", apiKey),
   ]);
+
+  if (!mobile) {
+    console.warn("fetchLighthouse: reintentando mobile");
+    mobile = await fetchLighthouseStrategy(url, "mobile", apiKey);
+  }
+  if (!desktop) {
+    console.warn("fetchLighthouse: reintentando desktop");
+    desktop = await fetchLighthouseStrategy(url, "desktop", apiKey);
+  }
 
   if (!mobile && !desktop) return null;
   return { mobile, desktop };
