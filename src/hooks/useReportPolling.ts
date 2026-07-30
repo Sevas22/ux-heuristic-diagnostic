@@ -54,6 +54,21 @@ export interface LighthouseScores {
   tbtMs: number | null;
 }
 
+export interface LighthouseReport {
+  mobile: LighthouseScores | null;
+  desktop: LighthouseScores | null;
+}
+
+// Los informes generados antes de medir mobile guardaron los puntajes en formato plano (solo
+// desktop). Se normalizan acá para que la UI no tenga que conocer las dos formas.
+export function normalizeLighthouse(
+  raw: LighthouseReport | LighthouseScores | null,
+): LighthouseReport | null {
+  if (!raw) return null;
+  if ("mobile" in raw || "desktop" in raw) return raw as LighthouseReport;
+  return { mobile: null, desktop: raw as LighthouseScores };
+}
+
 export interface NavEdge {
   from: string;
   to: string;
@@ -116,7 +131,7 @@ export interface ReportRow {
   journey_map: JourneySection[] | null;
   conclusions: Conclusions | null;
   reference_screenshots: ReferenceScreenshot[] | null;
-  lighthouse: LighthouseScores | null;
+  lighthouse: LighthouseReport | LighthouseScores | null;
   captured_evidence: CapturedEvidence | null;
   pdf_url: string | null;
   created_at: string | null;

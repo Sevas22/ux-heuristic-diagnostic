@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { useReportPolling } from "@/hooks/useReportPolling";
+import { useReportPolling, normalizeLighthouse } from "@/hooks/useReportPolling";
 import { exportElementToPdf } from "@/lib/exportPdf";
 import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
@@ -132,6 +132,8 @@ export default function ReportStatus() {
   const priorityFlowchart = findings.length > 0
     ? buildPriorityFlowchart({ critical: criticalCount, quickWins: quickWinsCount, highPriority: highPriorityCount })
     : null;
+
+  const lighthouse = normalizeLighthouse(data.lighthouse);
 
   // Se recrea en cada render para que la numeración siempre empiece en 1.
   const nextSection = createSectionCounter();
@@ -309,9 +311,9 @@ export default function ReportStatus() {
         </div>
       )}
 
-      {data.lighthouse && (
+      {lighthouse && (
         <div data-pdf-section>
-          <LighthouseScores lighthouse={data.lighthouse} sectionNumber={nextSection()} />
+          <LighthouseScores lighthouse={lighthouse} sectionNumber={nextSection()} />
         </div>
       )}
 

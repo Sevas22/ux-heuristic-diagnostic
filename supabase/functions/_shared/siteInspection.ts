@@ -22,6 +22,14 @@ export interface LighthouseResult {
   tbtMs: number | null;
 }
 
+// Google evalúa por defecto la versión móvil y es la que pesa para el ranking; además los puntajes
+// de mobile suelen ser bastante peores que los de desktop (CPU y red simuladas más lentas), así que
+// mostrar solo uno de los dos da una imagen incompleta.
+export interface LighthouseReport {
+  mobile: LighthouseResult | null;
+  desktop: LighthouseResult | null;
+}
+
 export interface SiteInspection {
   screenshotUrl: string | null;
   title: string | null;
@@ -101,16 +109,14 @@ export async function inspectSite(url: string): Promise<SiteInspection> {
 // de una función serverless no entraba en el límite del plan gratuito de Vercel).
 const PAGESPEED_TIMEOUT_MS = 60000;
 
-export async function fetchLighthouse(url: string): Promise<LighthouseResult | null> {
-  const apiKey = Deno.env.get("PAGESPEED_API_KEY");
-  if (!apiKey) {
-    console.warn("fetchLighthouse: PAGESPEED_API_KEY no está configurado, se omiten las métricas");
-    return null;
-  }
-
+async function fetchLighthouseStrategy(
+  url: string,
+  strategy: "mobile" | "desktop",
+  apiKey: string,
+): Promise<LighthouseResult | null> {
   const endpoint = new URL("https://www.googleapis.com/pagespeedonline/v5/runPagespeed");
   endpoint.searchParams.set("url", url);
-  endpoint.searchParams.set("strategy", "desktop");
+  endpoint.searchParams.set("strategy", strategy);
   endpoint.searchParams.set("key", apiKey);
   for (const category of ["performance", "accessibility", "seo", "best-practices"]) {
     endpoint.searchParams.append("category", category);
@@ -123,7 +129,7 @@ export async function fetchLighthouse(url: string): Promise<LighthouseResult | n
     clearTimeout(timeout);
 
     if (!res.ok) {
-      console.error(`fetchLighthouse: PageSpeed respondió ${res.status}`, await res.text());
+      console.error(`fetchLighthouse (${strategy}): PageSpeed respondió ${res.status}`, await res.text());
       return null;
     }
 
@@ -145,9 +151,27 @@ export async function fetchLighthouse(url: string): Promise<LighthouseResult | n
       tbtMs: audits?.["total-blocking-time"]?.numericValue ?? null,
     };
   } catch (err) {
-    console.error("fetchLighthouse: no se pudo obtener métricas de PageSpeed", url, err);
+    console.error(`fetchLighthouse (${strategy}): no se pudo obtener métricas de PageSpeed`, url, err);
     return null;
   }
+}
+
+// Las dos estrategias van en paralelo: son esperas de red contra Google, encadenarlas duplicaría
+// el tiempo sin ninguna necesidad. Si una falla, la otra igual se muestra.
+export async function fetchLighthouse(url: string): Promise<LighthouseReport | null> {
+  const apiKey = Deno.env.get("PAGESPEED_API_KEY");
+  if (!apiKey) {
+    console.warn("fetchLighthouse: PAGESPEED_API_KEY no está configurado, se omiten las métricas");
+    return null;
+  }
+
+  const [mobile, desktop] = await Promise.all([
+    fetchLighthouseStrategy(url, "mobile", apiKey),
+    fetchLighthouseStrategy(url, "desktop", apiKey),
+  ]);
+
+  if (!mobile && !desktop) return null;
+  return { mobile, desktop };
 }
 
 export interface AccessibilityFinding {
