@@ -75,17 +75,25 @@ export function pruneUnverifiedFindings(findings: Finding[], bundle: EvidenceBun
   const reasons: string[] = [];
 
   for (const finding of findings) {
+    // La garantía que importa es que el hallazgo APUNTE a evidencia real: eso es lo que se muestra
+    // al cliente en la línea "Evidencia" y lo que hace auditable el informe. Se sigue exigiendo.
     const evidenceOk = verifyEvidenceRef(finding.evidence_ref, bundle);
-    const quotesOk = evidenceOk && verifyQuotedText(finding.description, bundle) && verifyQuotedText(finding.recommendation, bundle);
 
-    if (evidenceOk && quotesOk) {
-      kept.push(finding);
-    } else {
+    if (!evidenceOk) {
       dropped.push(finding);
-      reasons.push(
-        `${finding.id}: evidence_ref "${finding.evidence_ref}" ${evidenceOk ? "no se pudo verificar el texto citado" : "no corresponde a evidencia real"}`,
-      );
+      reasons.push(`${finding.id}: evidence_ref "${finding.evidence_ref}" no corresponde a evidencia real`);
+      continue;
     }
+
+    // El chequeo de comillas era una segunda barrera pensada para citas fabricadas. Con análisis
+    // más extensos empezó a hacer más daño que bien: descartaba hallazgos válidos porque el modelo
+    // parafraseaba media frase de la descripción visual, dejando informes de un solo hallazgo.
+    // Se conserva como señal en los logs, pero ya no elimina el hallazgo.
+    if (!verifyQuotedText(finding.description, bundle) || !verifyQuotedText(finding.recommendation, bundle)) {
+      reasons.push(`${finding.id}: se conserva, pero cita texto que no aparece literal en la evidencia`);
+    }
+
+    kept.push(finding);
   }
 
   return { kept, dropped, reasons };

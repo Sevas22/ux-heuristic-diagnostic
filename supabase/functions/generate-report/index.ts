@@ -328,11 +328,29 @@ Deno.serve(async (req) => {
       });
     } catch (genError) {
       console.error("generate-report: fallo generando el informe", genError);
-      await supabase.from("submissions").update({ status: "failed" }).eq("id", submission.id);
-      return new Response(JSON.stringify({ error: "Fallo generando el informe" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+
+      // El plan gratuito de Groq permite ~1 informe por minuto: si dos personas solicitan a la vez,
+      // la segunda choca con el límite. Eso NO es un fallo del informe, es congestión momentánea.
+      // Marcarlo como "failed" dejaba la solicitud muerta y obligaba al usuario a empezar de cero,
+      // así que se devuelve al estado elegible para que el reintento funcione sobre la misma.
+      const message = String(genError);
+      const isTransient = message.includes("429") || message.toLowerCase().includes("rate limit");
+
+      await supabase
+        .from("submissions")
+        .update({ status: isTransient ? eligibleStatus : "failed" })
+        .eq("id", submission.id);
+
+      return new Response(
+        JSON.stringify({
+          error: isTransient ? "Servicio saturado, reintentá en un minuto" : "Fallo generando el informe",
+          code: isTransient ? "busy" : "failed",
+        }),
+        {
+          status: isTransient ? 429 : 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
   } catch (err) {
     console.error("generate-report error", err);

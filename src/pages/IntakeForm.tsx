@@ -138,7 +138,18 @@ export default function IntakeForm() {
         body: { submissionId },
       });
 
-      if (genError) throw genError;
+      if (genError) {
+        // El backend distingue la congestión momentánea (429) del fallo real. Decirle "algo salió
+        // mal" a alguien que solo llegó en mal momento lo hace abandonar, cuando bastaba esperar.
+        const status = (genError as { context?: { status?: number } }).context?.status;
+        if (status === 429) {
+          toast.error("Hay muchas solicitudes en curso. Espera un minuto y vuelve a intentarlo.");
+          submittingRef.current = false;
+          setSubmitting(false);
+          return;
+        }
+        throw genError;
+      }
 
       window.location.href = `/informe/${accessToken}`;
     } catch (err) {
