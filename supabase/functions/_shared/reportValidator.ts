@@ -36,15 +36,31 @@ function verifyEvidenceRef(ref: string, bundle: EvidenceBundle): boolean {
   if (ref.startsWith("axe:")) return true;
 
   if (ref.startsWith("heading:")) {
-    const text = normalize(ref.slice("heading:".length));
-    return bundle.headings.some((h) => normalize(h) === text);
+    return matchesAny(ref.slice("heading:".length), bundle.headings);
   }
   if (ref.startsWith("cta:")) {
-    const text = normalize(ref.slice("cta:".length));
-    return bundle.ctas.some((c) => normalize(c) === text);
+    return matchesAny(ref.slice("cta:".length), bundle.ctas);
   }
 
   return false;
+}
+
+// Coincidencia por contención en ambos sentidos, no igualdad estricta. El modelo suele citar una
+// versión recortada del texto real ("Creamos el futuro" por "Creamos el futuro en cada desarrollo")
+// y exigir igualdad descartaba hallazgos legítimos sobre contenido que SÍ existe en el sitio.
+// Se mantiene la garantía de fondo: la cita tiene que corresponder a texto realmente capturado.
+const MIN_MATCH_CHARS = 6;
+
+function matchesAny(cited: string, candidates: string[]): boolean {
+  const needle = normalize(cited);
+  if (needle.length < MIN_MATCH_CHARS) {
+    // Citas muy cortas ("Ver", "Menú") harían match con casi cualquier cosa: se exige igualdad.
+    return candidates.some((c) => normalize(c) === needle);
+  }
+  return candidates.some((c) => {
+    const hay = normalize(c);
+    return hay.includes(needle) || needle.includes(hay);
+  });
 }
 
 // El modelo a veces "decora" un hallazgo genérico con una cita entre comillas que suena real
