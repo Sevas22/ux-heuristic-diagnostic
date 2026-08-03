@@ -112,23 +112,31 @@ function extractInternalLinks(hrefs, baseUrl, limit) {
 // NO se toca /tmp/chromium ni /tmp/al2023: son el binario y las librerías extraídas, cuya
 // re-extracción cuesta varios segundos en cada arranque en frío.
 const TMP_DISPOSABLE = /^(playwright-artifacts-|playwright_chromium|core\.|chromium-pack)/;
+// Vercel puede ejecutar dos invocaciones a la vez en la misma instancia, compartiendo /tmp. Borrar
+// todo lo que coincida con el patrón hacía que una invocación eliminara el perfil de navegador que
+// la otra estaba usando en ese momento, y esa otra moría a los pocos segundos. Solo se borra lo que
+// lleva parado más que el techo de una ejecución: a esa altura ya no puede pertenecer a nadie vivo.
+const TMP_STALE_MS = 3 * 60 * 1000;
 
 function cleanupTmp() {
+  const now = Date.now();
   let removed = 0;
   try {
     for (const entry of fs.readdirSync("/tmp")) {
       if (!TMP_DISPOSABLE.test(entry)) continue;
+      const full = path.join("/tmp", entry);
       try {
-        fs.rmSync(path.join("/tmp", entry), { recursive: true, force: true });
+        if (now - fs.statSync(full).mtimeMs < TMP_STALE_MS) continue;
+        fs.rmSync(full, { recursive: true, force: true });
         removed++;
       } catch {
-        // Puede estar en uso por otra invocación concurrente; no es motivo para abortar.
+        // Pudo desaparecer entre el listado y el borrado; no es motivo para abortar.
       }
     }
   } catch (err) {
     console.error("cleanupTmp: no se pudo listar /tmp", err.message);
   }
-  if (removed > 0) console.log(`cleanupTmp: se liberaron ${removed} directorios temporales`);
+  if (removed > 0) console.log(`cleanupTmp: se liberaron ${removed} directorios temporales obsoletos`);
 }
 
 function mapAxeViolations(violations) {

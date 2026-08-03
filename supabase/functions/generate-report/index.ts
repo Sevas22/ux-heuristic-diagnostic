@@ -14,8 +14,14 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
-const MAX_INTERNAL_PAGES = 2;
-const MAX_REFERENCE_SCREENSHOTS = 2;
+// Cada inspección lanza un Chromium propio en Vercel y un sitio pesado tarda ~40s. La función de
+// Supabase corta a los 150s (WORKER_RESOURCE_LIMIT), así que el presupuesto es ajustado: se analiza
+// una página interna y una referencia, no dos, y lo opcional se descarta si vamos tarde.
+const MAX_INTERNAL_PAGES = 1;
+const MAX_REFERENCE_SCREENSHOTS = 1;
+// A partir de aquí ya no alcanza para inspeccionar otra página sin arriesgar que la función muera
+// y deje la solicitud colgada. Vale mucho más un informe con la home que ningún informe.
+const INTERNAL_PAGE_DEADLINE_MS = 55000;
 const MIN_VERIFIED_FINDINGS = 4;
 // llama-3.3-70b no seguía las instrucciones de profundidad: devolvía causas raíz que repetían el
 // síntoma ("la causa es la falta de jerarquía" para un problema de jerarquía) y recomendaciones
@@ -176,15 +182,28 @@ Deno.serve(async (req) => {
     }
 
     try {
-      // Inspección real de la home: screenshot, DOM renderizado (headings/CTAs) y axe-core.
-      // Lighthouse (vía PageSpeed) va en paralelo: es una espera de red larga contra un servicio
-      // externo, así que encadenarla sumaría ~30s al tiempo total sin ninguna necesidad.
-      const [homeInspection, lighthouse] = await Promise.all([
+      const startedAt = Date.now();
+      const referenceUrlsToInspect: string[] = (submission.reference_urls ?? []).slice(0, MAX_REFERENCE_SCREENSHOTS);
+
+      // Todo lo que no dependa de otra cosa arranca a la vez. Inspeccionar un sitio pesado puede
+      // tardar ~40s: encadenar home -> internas -> referencias sumaba más de dos minutos y la
+      // función se quedaba sin tiempo, dejando la solicitud colgada en "generating" para siempre.
+      // Las referencias no dependen de la home, así que no hay motivo para esperarlas en fila.
+      const [homeInspection, lighthouse, referenceInspections] = await Promise.all([
         inspectSite(submission.website_url),
         fetchLighthouse(submission.website_url),
+        Promise.all(referenceUrlsToInspect.map((url) => inspectSite(url))),
       ]);
 
-      const internalLinks = homeInspection.internalLinks.slice(0, MAX_INTERNAL_PAGES);
+      // Las páginas internas sí dependen de la home: sus enlaces se descubren al inspeccionarla.
+      // Son lo primero que se sacrifica si el sitio resultó lento, porque el informe se sostiene
+      // perfectamente con la home y perder la función entera no se sostiene de ninguna manera.
+      const elapsed = Date.now() - startedAt;
+      const internalLinks =
+        elapsed < INTERNAL_PAGE_DEADLINE_MS ? homeInspection.internalLinks.slice(0, MAX_INTERNAL_PAGES) : [];
+      if (elapsed >= INTERNAL_PAGE_DEADLINE_MS) {
+        console.warn(`generate-report: ${elapsed}ms en la inspección inicial, se omiten las páginas internas`);
+      }
       const internalInspections = await Promise.all(internalLinks.map((url) => inspectSite(url)));
 
       const pageCandidates: { url: string; inspection: SiteInspection }[] = [
@@ -200,9 +219,7 @@ Deno.serve(async (req) => {
         await supabase.from("submissions").update({ screenshot_url: homepageScreenshot }).eq("id", submission.id);
       }
 
-      const referenceUrls: string[] = (submission.reference_urls ?? []).slice(0, MAX_REFERENCE_SCREENSHOTS);
-      const referenceInspections = await Promise.all(referenceUrls.map((url) => inspectSite(url)));
-      const referenceScreenshots = referenceUrls
+      const referenceScreenshots = referenceUrlsToInspect
         .map((url, i) => ({ url, screenshot_url: referenceInspections[i].screenshotUrl }))
         .filter((r): r is { url: string; screenshot_url: string } => Boolean(r.screenshot_url));
 
