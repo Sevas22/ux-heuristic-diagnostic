@@ -19,9 +19,11 @@ const supabase = createClient(
 // una página interna y una referencia, no dos, y lo opcional se descarta si vamos tarde.
 const MAX_INTERNAL_PAGES = 1;
 const MAX_REFERENCE_SCREENSHOTS = 1;
-// A partir de aquí ya no alcanza para inspeccionar otra página sin arriesgar que la función muera
-// y deje la solicitud colgada. Vale mucho más un informe con la home que ningún informe.
-const INTERNAL_PAGE_DEADLINE_MS = 55000;
+// Si la inspección inicial ya tardó esto, el sitio es lento y una segunda página costaría otro
+// tanto: sumado a las llamadas al modelo se pasa de los 150s y la función muere sin informe.
+// El umbral es bajo a propósito — un sitio ágil (~10-15s) sigue analizando su página interna,
+// uno pesado se queda solo con la home, que es suficiente para sostener el informe.
+const INTERNAL_PAGE_DEADLINE_MS = 25000;
 const MIN_VERIFIED_FINDINGS = 4;
 // llama-3.3-70b no seguía las instrucciones de profundidad: devolvía causas raíz que repetían el
 // síntoma ("la causa es la falta de jerarquía" para un problema de jerarquía) y recomendaciones
