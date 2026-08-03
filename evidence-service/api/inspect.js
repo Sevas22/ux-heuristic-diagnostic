@@ -23,14 +23,18 @@ const MAX_HEADINGS = 20;
 const MAX_CTAS = 20;
 const CTA_MAX_LEN = 60;
 const NAV_TIMEOUT_MS = 20000;
-const NETWORK_IDLE_GRACE_MS = 5000;
+const NETWORK_IDLE_GRACE_MS = 3000;
 const DOM_EVIDENCE_TIMEOUT_MS = 8000;
-const AXE_TIMEOUT_MS = 15000;
-const SCREENSHOT_TIMEOUT_MS = 15000;
+const AXE_TIMEOUT_MS = 12000;
+// Más holgado que el resto a propósito: sin captura el informe pierde la portada visual, la
+// comparación con referencias y los marcadores de hallazgos. Es la evidencia que más se nota.
+const SCREENSHOT_TIMEOUT_MS = 20000;
 // Presupuesto total para navegación + evidencia + axe + screenshot combinados, medido desde que
 // el navegador termina de lanzar. Deja margen dentro de los 60s de maxDuration (Hobby) para el
 // arranque de Chromium, la subida a Supabase Storage y la construcción de la respuesta.
-const GLOBAL_BUDGET_MS = 40000;
+// A 40s cerraba el navegador justo cuando un sitio lento empezaba el screenshot: la evidencia de
+// texto llegaba completa pero el informe salía sin ninguna captura.
+const GLOBAL_BUDGET_MS = 48000;
 const SCREENSHOT_BUCKET = "evidence-screenshots";
 
 const NON_PAGE_EXTENSIONS = /\.(pdf|jpg|jpeg|png|gif|svg|webp|zip|rar|mp4|mp3|css|js|ico|xml|json)$/i;
