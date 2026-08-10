@@ -1,3 +1,5 @@
+import { describeAxeRule } from "./axeCatalog.ts";
+
 // Evidencia real del sitio: en vez de un fetch() crudo (que no ejecuta JS, no ve SPAs, y solo
 // podía dar título/descripción por regex) le pedimos a evidence-service — funciones serverless en
 // Vercel con Playwright — que abra la página de verdad y devuelva screenshot, DOM renderizado y
@@ -191,6 +193,10 @@ export interface AccessibilityFinding {
   severity: number;
   description: string;
   recommendation: string;
+  /** Causa raíz propia de la regla, no un texto genérico repetido en todos los hallazgos. */
+  rootCause: string;
+  /** A quién afecta y cómo, en concreto. */
+  userImpact: string;
   /** Cuántos nodos del DOM incumplen la regla — dato medido por axe, no estimado. */
   nodeCount: number;
 }
@@ -210,12 +216,18 @@ export function violationsToAccessibilityFindings(violations: AxeViolation[]): A
     .slice()
     .sort((a, b) => (IMPACT_SEVERITY[b.impact] ?? 0) - (IMPACT_SEVERITY[a.impact] ?? 0))
     .slice(0, 6)
-    .map((v) => ({
-      ruleId: v.id,
-      criterion: v.help,
-      severity: IMPACT_SEVERITY[v.impact] ?? 2,
-      description: `${v.description} (${v.nodeCount} elemento${v.nodeCount === 1 ? "" : "s"} afectado${v.nodeCount === 1 ? "" : "s"}).`,
-      recommendation: `Ver la guía de la regla axe "${v.id}": ${v.helpUrl}`,
-      nodeCount: v.nodeCount,
-    }));
+    .map((v) => {
+      const info = describeAxeRule(v.id, v.help, v.description);
+      const plural = v.nodeCount === 1 ? "" : "s";
+      return {
+        ruleId: v.id,
+        criterion: info.title,
+        severity: IMPACT_SEVERITY[v.impact] ?? 2,
+        description: `${info.problem} Afecta a ${v.nodeCount} elemento${plural} de la página.`,
+        rootCause: info.cause,
+        userImpact: info.userImpact,
+        recommendation: `${info.fix} Referencia técnica de la regla "${v.id}": ${v.helpUrl}`,
+        nodeCount: v.nodeCount,
+      };
+    });
 }

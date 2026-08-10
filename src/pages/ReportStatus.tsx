@@ -12,7 +12,7 @@ import ReportCover from "@/components/report/ReportCover";
 import LighthouseScores from "@/components/report/LighthouseScores";
 import AccessibilityAudit from "@/components/report/AccessibilityAudit";
 import CapturedEvidencePanel from "@/components/report/CapturedEvidencePanel";
-import UxScorecard, { buildCategoryScores } from "@/components/report/UxScorecard";
+import UxScorecard, { buildCategoryScores, isAccessibility } from "@/components/report/UxScorecard";
 import ImpactEffortPlan from "@/components/report/ImpactEffortPlan";
 import AnnotatedScreenshot from "@/components/report/AnnotatedScreenshot";
 import ReferenceComparison from "@/components/report/ReferenceComparison";
@@ -120,7 +120,9 @@ export default function ReportStatus() {
 
   const findings = data.findings ?? [];
   const heuristicCounts = findings.reduce<Record<string, number>>((acc, f) => {
-    const label = HEURISTIC_SHORT_LABELS[f.heuristic] ?? f.heuristic;
+    // Los hallazgos WCAG traen el título de su regla concreta, así que en el gráfico se agrupan
+    // bajo una sola categoría: si no, cada regla generaría su propia porción y sería ilegible.
+    const label = isAccessibility(f) ? "Accesibilidad (WCAG)" : HEURISTIC_SHORT_LABELS[f.heuristic] ?? f.heuristic;
     acc[label] = (acc[label] ?? 0) + 1;
     return acc;
   }, {});

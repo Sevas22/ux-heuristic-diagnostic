@@ -267,15 +267,19 @@ Deno.serve(async (req) => {
       const accessibilityFindings: Finding[] = accessibilityChecks.map((check, i) => ({
         id: `A-${String(i + 1).padStart(2, "0")}`,
         screen: submission.website_url,
-        heuristic: "Accesibilidad (WCAG)",
+        // El título del catálogo describe el problema en términos de producto ("Contraste
+        // insuficiente entre texto y fondo"), mucho más útil que repetir "Accesibilidad (WCAG)"
+        // en los seis hallazgos. La categoría se conserva entre paréntesis para poder agruparlos.
+        heuristic: `${check.criterion} (WCAG)`,
         severity: check.severity,
         impact_score: Math.min(check.severity / 4, 1),
-        description: `${check.criterion}: ${check.description}`,
-        root_cause:
-          "La regla WCAG se incumple en el marcado de la página: el elemento no expone la semántica o el contraste que las tecnologías de asistencia necesitan para interpretarlo.",
-        user_impact: "Puede excluir a usuarios que dependen de lectores de pantalla, navegación por teclado o zoom.",
+        description: check.description,
+        root_cause: check.rootCause,
+        user_impact: check.userImpact,
         business_impact:
-          "Reduce el alcance del sitio entre usuarios con discapacidad y es exigible por normativa de accesibilidad en la mayoría de mercados.",
+          check.severity >= 3
+            ? "Excluye a parte de los visitantes de completar la acción principal del sitio, y la accesibilidad web es exigible por normativa en la mayoría de mercados."
+            : "Degrada la experiencia de quienes usan tecnologías de asistencia y suma deuda de accesibilidad que encarece cualquier auditoría formal posterior.",
         recommendation: check.recommendation,
         priority: (check.severity >= 3 ? "Alta" : check.severity === 2 ? "Media" : "Baja") as "Alta" | "Media" | "Baja",
         // axe cuenta exactamente cuántos nodos del DOM incumplen cada regla, así que la frecuencia

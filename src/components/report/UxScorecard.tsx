@@ -9,6 +9,12 @@ interface CategoryScore {
   basis: string;
 }
 
+// Los hallazgos de accesibilidad llevan el título concreto de la regla ("Contraste insuficiente…")
+// y se marcan con el sufijo (WCAG), en vez de repetir la misma etiqueta genérica en todos.
+export function isAccessibility(finding: Finding): boolean {
+  return finding.heuristic.endsWith("(WCAG)");
+}
+
 // Penalización por hallazgo según severidad. Un crítico pesa mucho más que tres cosméticos, por eso
 // no se promedia: se descuenta desde 100 y se acota el mínimo para que el puntaje siga siendo legible.
 const SEVERITY_PENALTY: Record<number, number> = { 0: 0, 1: 2, 2: 5, 3: 10, 4: 18 };
@@ -24,7 +30,7 @@ export function buildCategoryScores(
 ): CategoryScore[] {
   const scores: CategoryScore[] = [];
 
-  const heuristicFindings = findings.filter((f) => f.heuristic !== "Accesibilidad (WCAG)");
+  const heuristicFindings = findings.filter((f) => !isAccessibility(f));
   scores.push({
     label: "Usabilidad heurística",
     score: usabilityScore(heuristicFindings),
@@ -33,7 +39,7 @@ export function buildCategoryScores(
 
   // Se prefiere el dato de Lighthouse por ser una medición; si no está, se cae a los hallazgos de axe.
   const lhA11y = lighthouse?.mobile?.accessibility ?? lighthouse?.desktop?.accessibility;
-  const a11yFindings = findings.filter((f) => f.heuristic === "Accesibilidad (WCAG)");
+  const a11yFindings = findings.filter(isAccessibility);
   if (lhA11y != null) {
     scores.push({ label: "Accesibilidad", score: lhA11y, basis: "Lighthouse + axe-core" });
   } else if (a11yFindings.length > 0) {
