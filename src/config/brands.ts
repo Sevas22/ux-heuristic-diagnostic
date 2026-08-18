@@ -49,6 +49,8 @@ export interface Brand {
   name: string;
   /** Encabezado propio. Se apaga cuando el sitio anfitrión ya tiene su propia navegación. */
   showHeader: boolean;
+  /** Franja oscura de cierre. Se apaga cuando la página anfitriona ya remata con su propio CTA. */
+  showClosingCta: boolean;
   /** Logo opcional; si falta se usa el nombre en texto. */
   logoUrl?: string;
   tokens: Tokens;
@@ -163,7 +165,10 @@ export const BRANDS: Record<string, Brand> = {
   idp: {
     id: "idp",
     name: "Agencia IDP",
-    showHeader: true,
+    // Embebida en agenciaidp.com/ui-ux/: la página anfitriona ya trae su propia navegación
+    // y su propio cierre con "Hablemos", así que repetirlos dentro del iframe duplicaba todo.
+    showHeader: false,
+    showClosingCta: false,
     tokens: {
       ...DEFAULT_TOKENS,
       "--background": "0 0% 100%",
@@ -203,6 +208,7 @@ export const BRANDS: Record<string, Brand> = {
     id: "agencia2",
     name: "Tu Agencia",
     showHeader: true,
+    showClosingCta: true,
     tokens: {
       ...DEFAULT_TOKENS,
       "--primary": "266 70% 45%",

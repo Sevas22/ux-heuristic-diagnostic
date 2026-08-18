@@ -279,10 +279,22 @@ export default function Landing() {
               </li>
             ))}
           </ul>
+
+          {/* Sin la franja de cierre, el hero quedaba como único punto de conversión y había
+              ~2000px de contenido después. Este botón cierra ese hueco sin repetir la marca. */}
+          <div className="mt-10">
+            <Button asChild variant="cta" size="xl">
+              <Link to="/formulario">
+                {copy.ctaPrimary}
+                <ArrowRight className="ml-1" />
+              </Link>
+            </Button>
+          </div>
         </div>
       </section>
 
       {/* CIERRE */}
+      {brand.showClosingCta && (
       <section className="bg-ink py-16 md:py-20">
         <div className="container mx-auto flex flex-col items-center gap-6 text-center">
           <h2 className="max-w-2xl font-display text-3xl font-extrabold text-ink-foreground md:text-4xl">
@@ -311,6 +323,7 @@ export default function Landing() {
           </div>
         </div>
       </section>
+      )}
 
       <footer className="border-t border-border bg-background py-8">
         <div className="container mx-auto flex flex-col items-center gap-1 text-center">
