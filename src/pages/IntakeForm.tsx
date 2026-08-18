@@ -161,7 +161,8 @@ export default function IntakeForm() {
   }
 
   return (
-    <div className="container mx-auto max-w-xl py-12">
+    <div className="min-h-screen bg-surface py-12">
+      <div className="container mx-auto max-w-xl">
       <Link to="/" className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Volver
       </Link>
@@ -269,7 +270,7 @@ export default function IntakeForm() {
                 )}
               />
 
-              <Button type="submit" className="w-full" disabled={submitting}>
+              <Button type="submit" variant="cta" size="lg" className="w-full" disabled={submitting}>
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 {submitting ? "Auditando tu sitio a fondo... puede tardar 1-3 minutos" : "Generar mi diagnóstico"}
               </Button>
@@ -277,6 +278,7 @@ export default function IntakeForm() {
           </Form>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

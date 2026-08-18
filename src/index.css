@@ -1,13 +1,23 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600&display=swap');
+/* Se cargan las familias de todas las marcas en una sola petición; cada marca elige la suya
+   con los tokens --font-display / --font-body (ver src/config/brands.ts). */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  /* Valores por defecto. initBrand() los sobrescribe en :root antes del primer render,
+     así que esto es solo el piso: garantiza que nada quede sin definir. */
   :root {
-    --background: 210 40% 98%;
+    --background: 0 0% 100%;
     --foreground: 222 30% 14%;
+
+    /* Fondo alterno para separar secciones sin dibujar bordes. */
+    --surface: 210 40% 97%;
+    /* Bloque oscuro de cierre / franja de CTA. */
+    --ink: 222 30% 12%;
+    --ink-foreground: 0 0% 100%;
 
     --card: 0 0% 100%;
     --card-foreground: 222 30% 14%;
@@ -17,18 +27,22 @@
 
     --primary: 222 65% 40%;
     --primary-foreground: 0 0% 100%;
-
-    --primary-soft: 222 60% 94%;
+    --primary-soft: 222 60% 95%;
     --primary-glow: 222 70% 60%;
 
-    --secondary: 210 30% 94%;
+    /* Color de acción de la marca. Va separado de --accent porque shadcn usa --accent
+       para estados hover neutros; teñirlo pintaría de naranja cada botón fantasma. */
+    --cta: 222 65% 40%;
+    --cta-foreground: 0 0% 100%;
+
+    --secondary: 210 30% 95%;
     --secondary-foreground: 222 30% 20%;
 
-    --muted: 210 25% 95%;
+    --muted: 210 25% 96%;
     --muted-foreground: 222 15% 45%;
 
-    --accent: 172 55% 40%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 210 30% 94%;
+    --accent-foreground: 222 30% 20%;
 
     --destructive: 0 70% 50%;
     --destructive-foreground: 0 0% 100%;
@@ -39,15 +53,19 @@
     --warning: 38 90% 50%;
     --warning-foreground: 222 30% 14%;
 
-    --border: 214 25% 89%;
-    --input: 214 25% 89%;
+    --border: 214 25% 90%;
+    --input: 214 25% 90%;
     --ring: 222 65% 40%;
 
     --radius: 0.75rem;
+    --radius-pill: 999px;
 
-    --shadow-soft: 0 4px 24px -4px hsl(222 40% 30% / 0.10);
-    --shadow-card: 0 2px 16px -2px hsl(222 30% 14% / 0.06);
-    --shadow-primary: 0 8px 32px -8px hsl(222 65% 40% / 0.30);
+    --font-display: 'Manrope', system-ui, sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+
+    --shadow-soft: 0 4px 24px -4px hsl(var(--foreground) / 0.10);
+    --shadow-card: 0 2px 16px -2px hsl(var(--foreground) / 0.06);
+    --shadow-primary: 0 8px 32px -8px hsl(var(--cta) / 0.35);
   }
 }
 
@@ -58,10 +76,10 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: var(--font-body);
   }
 
   h1, h2, h3 {
-    font-family: 'Manrope', system-ui, sans-serif;
+    font-family: var(--font-display);
   }
 }
